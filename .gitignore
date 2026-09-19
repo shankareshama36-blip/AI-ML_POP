@@ -9,3 +9,4 @@ build/
 am_pop.egg-info/
 .DS_Store
 *.pyc
+data/raw/*.csv

@@ -1,0 +1,36 @@
+{
+  "feature_columns": [
+    "temperature_c",
+    "vibration_mm_s",
+    "tool_wear_min",
+    "condition_severity",
+    "priority_level",
+    "action_REPAIR_NOW",
+    "action_CONTINUE_TEMP",
+    "action_REDUCE_PROD",
+    "action_REALLOCATE"
+  ],
+  "actions": [
+    "REPAIR_NOW",
+    "CONTINUE_TEMP",
+    "REDUCE_PROD",
+    "REALLOCATE"
+  ],
+  "condition_map": {
+    "NORMAL": 0,
+    "WARN": 1,
+    "ALERT": 2,
+    "CRITICAL": 3
+  },
+  "priority_map": {
+    "LOW": 0,
+    "MEDIUM": 1,
+    "HIGH": 2,
+    "CRITICAL": 3
+  },
+  "risk_midpoints": {
+    "0": 0.15,
+    "1": 0.4,
+    "2": 0.75
+  }
+}

@@ -1,8 +1,12 @@
-"""Deterministic baseline implementations of the V1 decision-loop stages.
+"""Decision-loop stages for the V1 AM&POP engine.
 
-The prediction equations are intentionally transparent baselines, not a trained
-ML model.  Their stable output makes the API testable while establishing the
-contract a future model can replace.
+Stage 1: Formal validation (in formal_engine)
+Stage 2: Context building
+Stage 3: Action generation
+Stage 4: ML prediction (scikit-learn models)
+Stage 5: Constraint evaluation
+Stage 6: Dijkstra optimization
+Stage 7: Decision construction
 """
 
 from __future__ import annotations
@@ -107,46 +111,37 @@ def _severity(context: DecisionContext) -> float:
 def predict_outcomes(
     actions: list[CandidateAction], context: DecisionContext
 ) -> list[Prediction]:
-    """Produce deterministic baseline forecasts for each candidate action."""
+    """Predict outcomes using trained scikit-learn models."""
+    from backend.app.prediction import get_engine
 
-    severity = _severity(context)
-    urgency = PRIORITY_MULTIPLIER[context.priority]
-    forecasts: dict[ActionType, tuple[float, float, float, float]] = {
-        ActionType.REPAIR_NOW: (
-            3.0 + severity * 1.5,
-            (1_400 + severity * 950) * urgency,
-            min(0.30, 0.07 + severity * 0.04),
-            0.86,
-        ),
-        ActionType.CONTINUE_TEMP: (
-            0.25 + severity * 0.5,
-            (125 + severity * 125) * urgency,
-            min(0.98, 0.14 + severity * 0.23),
-            0.68,
-        ),
-        ActionType.REDUCE_PROD: (
-            1.5 + severity * 0.75,
-            (400 + severity * 225) * urgency,
-            min(0.85, 0.12 + severity * 0.13),
-            0.76,
-        ),
-        ActionType.REALLOCATE: (
-            2.0 + severity * 0.8,
-            (750 + severity * 375) * urgency,
-            min(0.70, 0.08 + severity * 0.10),
-            0.79,
-        ),
-    }
-    return [
-        Prediction(
-            action_id=action.action_id,
-            predicted_downtime_hours=round(forecasts[action.action_type][0], 2),
-            predicted_cost=round(forecasts[action.action_type][1], 2),
-            predicted_risk_score=round(forecasts[action.action_type][2], 3),
-            confidence=forecasts[action.action_type][3],
+    engine = get_engine()
+    ms = context.machine_state
+    results: list[Prediction] = []
+
+    for action in actions:
+        action_type = (
+            action.action_type.value
+            if hasattr(action.action_type, "value")
+            else str(action.action_type)
         )
-        for action in actions
-    ]
+        downtime, cost, risk, confidence = engine.predict(
+            temperature_c=float(getattr(ms, "temperature_c", 70.0)),
+            vibration_mm_s=float(getattr(ms, "vibration_mm_s", 3.0)),
+            tool_wear_min=float(getattr(ms, "tool_wear_min", 0.0)),
+            condition=str(context.condition),
+            priority=str(context.priority),
+            action_type=action_type,
+        )
+        results.append(
+            Prediction(
+                action_id=action.action_id,
+                predicted_downtime_hours=round(downtime, 2),
+                predicted_cost=round(cost, 2),
+                predicted_risk_score=round(risk, 3),
+                confidence=round(confidence, 3),
+            )
+        )
+    return results
 
 
 def evaluate_constraints(
