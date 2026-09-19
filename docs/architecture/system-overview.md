@@ -23,6 +23,24 @@ INPUT
 -> ACTUAL OUTCOME
 -> EXPERIENCE MEMORY
 
+### Formal validation (current feature)
+
+The first implemented decision-loop stage is deterministic formal validation of
+a maintenance request. It accepts the ordered fields `machine_id`,
+`maintenance_type`, `priority`, `condition`, and `action`, normalizes each
+value, and checks it against an explicit allowed vocabulary.
+Unexpected fields are rejected so the request shape remains explicit and
+traceable.
+
+The DFA path for a valid request is:
+
+`START -> MACHINE_VALID -> TYPE_VALID -> PRIORITY_VALID -> CONDITION_VALID -> ACTION_VALID -> ACCEPT`
+
+An invalid value transitions directly to `REJECT`. The validator returns the
+acceptance result, final state, human-readable reason, failed field (when
+applicable), and the state trace. This makes the FLAT mapping observable and
+gives later stages a traceable validated input.
+
 ## 5. Major Modules
 - **Backend API (FastAPI):** Exposes endpoints for the frontend.
 - **Formal Engine:** DFA validation of inputs.
