@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -18,26 +18,26 @@ class ContractModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class MachineStatus(str, Enum):
+class MachineStatus(StrEnum):
     RUNNING = "RUNNING"
     DEGRADED = "DEGRADED"
     OFFLINE = "OFFLINE"
 
 
-class ActionType(str, Enum):
+class ActionType(StrEnum):
     REPAIR_NOW = "REPAIR_NOW"
     CONTINUE_TEMP = "CONTINUE_TEMP"
     REDUCE_PROD = "REDUCE_PROD"
     REALLOCATE = "REALLOCATE"
 
 
-class RiskLevel(str, Enum):
+class RiskLevel(StrEnum):
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
 
 
-class ApprovalStatus(str, Enum):
+class ApprovalStatus(StrEnum):
     PENDING = "PENDING"
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
@@ -77,7 +77,7 @@ class DecisionEvaluationRequest(ContractModel):
     """One complete maintenance situation submitted to the decision loop."""
 
     request_id: UUID = Field(default_factory=uuid4)
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     maintenance_request: MaintenanceRequest
     machine_state: MachineState
     operational_constraints: OperationalConstraints
@@ -131,7 +131,7 @@ class ApprovalUpdate(ContractModel):
 
     status: ApprovalStatus
     approver_id: str = Field(..., min_length=1, max_length=128)
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class Outcome(ContractModel):
@@ -140,7 +140,7 @@ class Outcome(ContractModel):
     actual_cost: float = Field(..., ge=0)
     success: bool
     notes: str = Field(default="", max_length=2_000)
-    recorded_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    recorded_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class OutcomeCreate(ContractModel):
@@ -148,7 +148,7 @@ class OutcomeCreate(ContractModel):
     actual_cost: float = Field(..., ge=0)
     success: bool
     notes: str = Field(default="", max_length=2_000)
-    recorded_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    recorded_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class Experience(ContractModel):

@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Optional
 
 import joblib
 import numpy as np
@@ -71,7 +70,7 @@ class PredictionEngine:
         )
 
 
-_engine: Optional[PredictionEngine] = None
+_engine: PredictionEngine | None = None
 
 
 def get_engine() -> PredictionEngine:

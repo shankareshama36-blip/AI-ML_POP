@@ -1,30 +1,44 @@
 [project]
 name = "am-pop"
 version = "0.1.0"
-description = "AM&POP backend foundation"
-requires-python = ">=3.14"
+description = "AM&POP — Decision Intelligence Layer for Autonomous Operations"
+readme = "README.md"
+requires-python = ">=3.11"
 dependencies = [
     "fastapi",
-    "pydantic",
     "uvicorn[standard]",
+    "pydantic",
+    "scikit-learn",
+    "pandas",
+    "numpy",
+    "joblib",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "httpx",
     "pytest",
+    "httpx",
+    "httpx2",
     "ruff",
 ]
 
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["backend*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]
+filterwarnings = [
+    "ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning:starlette.testclient",
+]
 
 [tool.ruff]
 line-length = 88
-
-[tool.ruff.lint.isort]
-known-first-party = ["backend"]
+target-version = "py311"
 
 [tool.ruff.lint]
-select = ["E", "F", "I"]
+select = ["E", "F", "I", "W", "UP", "B"]
+ignore = ["E501"]

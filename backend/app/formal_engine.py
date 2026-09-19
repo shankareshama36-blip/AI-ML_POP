@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Final
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class DfaState(str, Enum):
+class DfaState(StrEnum):
     """Explicit states in the maintenance-request validation DFA."""
 
     START = "START"
@@ -19,7 +19,7 @@ class DfaState(str, Enum):
     REJECT = "REJECT"
 
 
-class InputSymbol(str, Enum):
+class InputSymbol(StrEnum):
     """The categories consumed by the DFA as it validates a request."""
 
     MACHINE_ID = "MACHINE_ID"

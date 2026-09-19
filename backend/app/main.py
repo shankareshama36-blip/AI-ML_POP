@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, status
@@ -80,7 +80,7 @@ def evaluate_maintenance_decision(
     pending_approval = Approval(
         decision_id=artifacts.decision.decision_id,
         status=ApprovalStatus.PENDING,
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
     )
     workflow = DecisionWorkflowResponse(
         request_id=payload.request_id,
