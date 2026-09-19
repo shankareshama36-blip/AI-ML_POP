@@ -1,6 +1,6 @@
 # AM&POP Decision Contract
 
-This document defines the common language for the AM&POP system. All modules (backend, ML, optimization, frontend) must use these exact structures.
+This document defines the common language for the AM&POP system. All modules (backend, ML, optimization, frontend) must use these exact structures. The typed Pydantic models in `backend/app/models.py` implement this contract.
 
 ## 1. DecisionRequest
 **Purpose:** The initial input from the user or system.
@@ -71,3 +71,19 @@ This document defines the common language for the AM&POP system. All modules (ba
 - `decision_taken`: Serialized DecisionResult
 - `prediction_accuracy`: Delta between predicted and actual
 - `outcome`: Serialized Outcome
+
+## 11. Workflow and lifecycle rules
+
+1. `DecisionEvaluationRequest` contains a formal `MaintenanceRequest`, a
+   `MachineState`, and `OperationalConstraints`.
+2. Formal validation must accept the maintenance request before the remaining
+   decision stages run.
+3. A created `DecisionResult` receives an `Approval` with `PENDING` status.
+4. A pending decision can be approved or rejected exactly once by a named
+   approver. `PENDING` cannot be submitted as an approval update.
+5. Only an approved decision can receive one `Outcome`.
+6. Recording an outcome appends an `Experience`, including cost and downtime
+   deltas between the decision forecast and actual result.
+
+All API input models forbid unknown fields. This keeps each decision request
+explicit and its audit trail stable as downstream components evolve.
