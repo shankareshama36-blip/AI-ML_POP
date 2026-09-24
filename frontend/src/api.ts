@@ -1,5 +1,36 @@
 const BASE = "/api";
 
+export interface MaintenanceRequestInput {
+  machine_id: string;
+  maintenance_type: string;
+  priority: string;
+  condition: string;
+  action: string;
+}
+
+export interface MachineStateInput {
+  temperature_c: number;
+  vibration_mm_s: number;
+  operating_hours: number;
+  status: string;
+}
+
+export interface OperationalConstraintsInput {
+  max_budget: number;
+  max_downtime_hours: number;
+  deadline_hours: number;
+  technicians_available: boolean;
+  spare_parts_available: boolean;
+  downtime_cost_per_hour: number;
+  risk_cost_factor: number;
+}
+
+export interface DecisionInput {
+  maintenance_request: MaintenanceRequestInput;
+  machine_state: MachineStateInput;
+  operational_constraints: OperationalConstraintsInput;
+}
+
 export interface DecisionResponse {
   request_id: string;
   timestamp: string;
@@ -48,36 +79,13 @@ export interface DecisionResponse {
   };
 }
 
-export async function evaluateDecision(): Promise<DecisionResponse> {
-  const payload = {
-    maintenance_request: {
-      machine_id: "M-101",
-      maintenance_type: "CORRECTIVE",
-      priority: "HIGH",
-      condition: "ALERT",
-      action: "REPAIR",
-    },
-    machine_state: {
-      temperature_c: 92,
-      vibration_mm_s: 7.5,
-      operating_hours: 1800,
-      status: "DEGRADED",
-    },
-    operational_constraints: {
-      max_budget: 50000,
-      max_downtime_hours: 12,
-      deadline_hours: 8,
-      technicians_available: true,
-      spare_parts_available: true,
-      downtime_cost_per_hour: 1000,
-      risk_cost_factor: 5000,
-    },
-  };
-
+export async function evaluateDecision(
+  input: DecisionInput
+): Promise<DecisionResponse> {
   const res = await fetch(`${BASE}/decisions/evaluate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(input),
   });
 
   if (!res.ok) {
