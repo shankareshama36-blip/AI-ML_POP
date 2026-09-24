@@ -1,8 +1,14 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, Request, status
+from slowapi.errors import RateLimitExceeded
 
+from backend.app.core.rate_limit import (
+    limiter,
+    rate_limit_exceeded_handler,
+)
+from backend.app.core.security import add_security_middleware
 from backend.app.decision_engine import NoFeasibleActionError, evaluate_decision
 from backend.app.formal_engine import (
     DfaValidationResult,
@@ -25,6 +31,10 @@ from backend.app.repository import (
 )
 
 app = FastAPI(title="AM&POP API")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+add_security_middleware(app)
+
 decision_repository = DecisionRepository()
 
 
@@ -37,7 +47,9 @@ def health() -> dict[str, str]:
     "/validate/maintenance-request",
     response_model=DfaValidationResult,
 )
+@limiter.limit("60/minute")
 def validate_maintenance_request_endpoint(
+    request: Request,
     payload: MaintenanceRequest,
 ) -> DfaValidationResult:
     """Expose the DFA validator via the FastAPI application."""
@@ -50,7 +62,9 @@ def validate_maintenance_request_endpoint(
     response_model=DecisionWorkflowResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit("60/minute")
 def evaluate_maintenance_decision(
+    request: Request,
     payload: DecisionEvaluationRequest,
 ) -> DecisionWorkflowResponse:
     """Run the complete V1 decision loop and create a pending audit record."""
@@ -98,7 +112,10 @@ def evaluate_maintenance_decision(
 
 
 @app.get("/decisions/{decision_id}", response_model=DecisionWorkflowResponse)
-def get_decision(decision_id: UUID) -> DecisionWorkflowResponse:
+@limiter.limit("60/minute")
+def get_decision(
+    request: Request, decision_id: UUID
+) -> DecisionWorkflowResponse:
     """Retrieve a decision and its immutable stage-by-stage audit trail."""
 
     try:
@@ -110,8 +127,9 @@ def get_decision(decision_id: UUID) -> DecisionWorkflowResponse:
 
 
 @app.post("/decisions/{decision_id}/approval", response_model=DecisionWorkflowResponse)
+@limiter.limit("60/minute")
 def update_decision_approval(
-    decision_id: UUID, payload: ApprovalUpdate
+    request: Request, decision_id: UUID, payload: ApprovalUpdate
 ) -> DecisionWorkflowResponse:
     """Record the manager's human-in-the-loop decision."""
 
@@ -128,8 +146,9 @@ def update_decision_approval(
 
 
 @app.post("/decisions/{decision_id}/outcome", response_model=DecisionWorkflowResponse)
+@limiter.limit("60/minute")
 def record_decision_outcome(
-    decision_id: UUID, payload: OutcomeCreate
+    request: Request, decision_id: UUID, payload: OutcomeCreate
 ) -> DecisionWorkflowResponse:
     """Record execution results and add an experience-memory entry."""
 

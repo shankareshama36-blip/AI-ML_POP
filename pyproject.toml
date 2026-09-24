@@ -12,6 +12,7 @@ dependencies = [
     "pandas",
     "numpy",
     "joblib",
+    "slowapi",
 ]
 
 [project.optional-dependencies]

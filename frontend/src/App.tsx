@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   evaluateDecision,
   approveDecision,
@@ -6,6 +6,7 @@ import {
   type DecisionResponse,
 } from "./api";
 import { DecisionExplanation } from "./DecisionExplanation";
+import { validateDecisionInput } from "./validation";
 import "./App.css";
 
 const EMPTY_INPUT: DecisionInput = {
@@ -39,6 +40,8 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
+
+  const validation = useMemo(() => validateDecisionInput(input), [input]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -89,14 +92,64 @@ function App() {
     }));
   }
 
+  function formatErrorMessage(e: unknown): string {
+    if (e instanceof TypeError && e.message.toLowerCase().includes("fetch")) {
+      return "Cannot reach backend. Is it running on port 8000?";
+    }
+    const message = e instanceof Error ? e.message : String(e);
+    if (message.toLowerCase().includes("failed to fetch") || message.toLowerCase().includes("networkerror")) {
+      return "Cannot reach backend. Is it running on port 8000?";
+    }
+
+    const httpMatch = message.match(/^HTTP (\d+): (.*)$/s);
+    if (httpMatch) {
+      const status = parseInt(httpMatch[1], 10);
+      const rawBody = httpMatch[2];
+
+      let parsedMsg = rawBody;
+      try {
+        const json = JSON.parse(rawBody);
+        if (json.detail) {
+          if (typeof json.detail === "string") {
+            parsedMsg = json.detail;
+          } else if (json.detail.message) {
+            parsedMsg = json.detail.message;
+          } else if (json.detail.validation?.reason) {
+            parsedMsg = json.detail.validation.reason;
+          } else if (Array.isArray(json.detail)) {
+            parsedMsg = json.detail.map((d: any) => d.msg || JSON.stringify(d)).join(", ");
+          } else {
+            parsedMsg = JSON.stringify(json.detail);
+          }
+        }
+      } catch {
+        // use raw body
+      }
+
+      if (status === 409) {
+        return `No feasible action: ${parsedMsg}`;
+      }
+      if (status === 422) {
+        return `Formal validation failed: ${parsedMsg}`;
+      }
+      if (status >= 500 && status <= 599) {
+        return "Server error. Try again.";
+      }
+      return parsedMsg;
+    }
+
+    return message;
+  }
+
   async function handleRun() {
+    if (loading || !validation.valid) return;
     setLoading(true);
     setError(null);
     try {
       const d = await evaluateDecision(input);
       setDecision(d);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(formatErrorMessage(e));
     } finally {
       setLoading(false);
     }
@@ -143,6 +196,9 @@ function App() {
                 )
               )}
             </select>
+            {validation.errors["machine_id"] && (
+              <span className="field-error">{validation.errors["machine_id"]}</span>
+            )}
           </label>
 
           <label>
@@ -161,6 +217,11 @@ function App() {
                 )
               )}
             </select>
+            {validation.errors["maintenance_type"] && (
+              <span className="field-error">
+                {validation.errors["maintenance_type"]}
+              </span>
+            )}
           </label>
 
           <label>
@@ -175,6 +236,9 @@ function App() {
                 </option>
               ))}
             </select>
+            {validation.errors["priority"] && (
+              <span className="field-error">{validation.errors["priority"]}</span>
+            )}
           </label>
 
           <label>
@@ -189,6 +253,9 @@ function App() {
                 </option>
               ))}
             </select>
+            {validation.errors["condition"] && (
+              <span className="field-error">{validation.errors["condition"]}</span>
+            )}
           </label>
 
           <label>
@@ -205,6 +272,9 @@ function App() {
                 )
               )}
             </select>
+            {validation.errors["action"] && (
+              <span className="field-error">{validation.errors["action"]}</span>
+            )}
           </label>
         </div>
       </section>
@@ -222,6 +292,11 @@ function App() {
                 updateState("temperature_c", Number(e.target.value))
               }
             />
+            {validation.errors["temperature_c"] && (
+              <span className="field-error">
+                {validation.errors["temperature_c"]}
+              </span>
+            )}
           </label>
 
           <label>
@@ -234,6 +309,11 @@ function App() {
                 updateState("vibration_mm_s", Number(e.target.value))
               }
             />
+            {validation.errors["vibration_mm_s"] && (
+              <span className="field-error">
+                {validation.errors["vibration_mm_s"]}
+              </span>
+            )}
           </label>
 
           <label>
@@ -245,6 +325,11 @@ function App() {
                 updateState("operating_hours", Number(e.target.value))
               }
             />
+            {validation.errors["operating_hours"] && (
+              <span className="field-error">
+                {validation.errors["operating_hours"]}
+              </span>
+            )}
           </label>
 
           <label>
@@ -259,6 +344,9 @@ function App() {
                 </option>
               ))}
             </select>
+            {validation.errors["status"] && (
+              <span className="field-error">{validation.errors["status"]}</span>
+            )}
           </label>
         </div>
       </section>
@@ -275,6 +363,11 @@ function App() {
                 updateConstraints("max_budget", Number(e.target.value))
               }
             />
+            {validation.errors["max_budget"] && (
+              <span className="field-error">
+                {validation.errors["max_budget"]}
+              </span>
+            )}
           </label>
 
           <label>
@@ -287,6 +380,11 @@ function App() {
                 updateConstraints("max_downtime_hours", Number(e.target.value))
               }
             />
+            {validation.errors["max_downtime_hours"] && (
+              <span className="field-error">
+                {validation.errors["max_downtime_hours"]}
+              </span>
+            )}
           </label>
 
           <label>
@@ -299,6 +397,11 @@ function App() {
                 updateConstraints("deadline_hours", Number(e.target.value))
               }
             />
+            {validation.errors["deadline_hours"] && (
+              <span className="field-error">
+                {validation.errors["deadline_hours"]}
+              </span>
+            )}
           </label>
 
           <label>
@@ -313,6 +416,11 @@ function App() {
                 )
               }
             />
+            {validation.errors["downtime_cost_per_hour"] && (
+              <span className="field-error">
+                {validation.errors["downtime_cost_per_hour"]}
+              </span>
+            )}
           </label>
 
           <label>
@@ -324,6 +432,11 @@ function App() {
                 updateConstraints("risk_cost_factor", Number(e.target.value))
               }
             />
+            {validation.errors["risk_cost_factor"] && (
+              <span className="field-error">
+                {validation.errors["risk_cost_factor"]}
+              </span>
+            )}
           </label>
 
           <label className="checkbox">
@@ -350,11 +463,17 @@ function App() {
         </div>
       </section>
 
-      <button onClick={handleRun} disabled={loading}>
-        {loading ? "Running…" : "Evaluate Decision"}
+      <button onClick={handleRun} disabled={loading || !validation.valid}>
+        {loading ? (
+          <>
+            <span className="spinner" /> Evaluating…
+          </>
+        ) : (
+          "Evaluate Decision"
+        )}
       </button>
 
-      {error && <div className="error">Error: {error}</div>}
+      {error && <div className="error-box">Error: {error}</div>}
 
       {decision && (
         <>
