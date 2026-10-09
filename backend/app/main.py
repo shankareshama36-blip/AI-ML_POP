@@ -4,6 +4,8 @@ from uuid import UUID
 from fastapi import FastAPI, HTTPException, Request, status
 from slowapi.errors import RateLimitExceeded
 
+from backend.app.api.auth_api import router as auth_router
+from backend.app.api.complaints_api import router as complaints_router
 from backend.app.core.rate_limit import (
     limiter,
     rate_limit_exceeded_handler,
@@ -34,6 +36,9 @@ app = FastAPI(title="AM&POP API")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 add_security_middleware(app)
+
+app.include_router(auth_router)
+app.include_router(complaints_router)
 
 decision_repository = DecisionRepository()
 
