@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { type User } from "./api";
+import { LandingPage } from "./pages/LandingPage";
 import { LoginPage } from "./pages/LoginPage";
 import { TechnicianPage } from "./pages/TechnicianPage";
 import { ApproverPage } from "./pages/ApproverPage";
@@ -7,37 +8,63 @@ import "./App.css";
 
 const STORAGE_KEY = "am-pop-user";
 
+type View = "landing" | "login" | "app";
+
 function App() {
-  const [user, setUser] = useState<User | null>(() => {
-    try {
-      const saved = sessionStorage.getItem(STORAGE_KEY);
-      return saved ? (JSON.parse(saved) as User) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [view, setView] = useState<View>("landing");
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    if (user) {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-    } else {
-      sessionStorage.removeItem(STORAGE_KEY);
+    try {
+      const saved = sessionStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as User;
+        setUser(parsed);
+        setView("app");
+      } else {
+        setView("landing");
+      }
+    } catch {
+      setView("landing");
     }
-  }, [user]);
+  }, []);
+
+  function handleLoginSuccess(authenticatedUser: User) {
+    setUser(authenticatedUser);
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(authenticatedUser));
+    setView("app");
+  }
 
   function handleLogout() {
     setUser(null);
+    sessionStorage.removeItem(STORAGE_KEY);
+    setView("landing");
   }
 
-  if (!user) {
-    return <LoginPage onLogin={setUser} />;
-  }
+  return (
+    <div className="animate-fade">
+      {view === "landing" && (
+        <LandingPage onSignIn={() => setView("login")} />
+      )}
 
-  if (user.role === "technician") {
-    return <TechnicianPage user={user} onLogout={handleLogout} />;
-  }
+      {view === "login" && (
+        <LoginPage
+          onLogin={handleLoginSuccess}
+          onBack={() => setView("landing")}
+        />
+      )}
 
-  return <ApproverPage user={user} onLogout={handleLogout} />;
+      {view === "app" && user && (
+        <>
+          {user.role === "technician" ? (
+            <TechnicianPage user={user} onLogout={handleLogout} />
+          ) : (
+            <ApproverPage user={user} onLogout={handleLogout} />
+          )}
+        </>
+      )}
+    </div>
+  );
 }
 
 export default App;

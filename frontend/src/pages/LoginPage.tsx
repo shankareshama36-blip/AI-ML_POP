@@ -1,18 +1,20 @@
 import { useState, type FormEvent } from "react";
 import { login, type User } from "../api";
+import { IconAlert, IconSpinner } from "../components/Icons";
 
 interface LoginPageProps {
   onLogin: (user: User) => void;
+  onBack?: () => void;
 }
 
 const DEMO_USERS = [
   { username: "tech-1", pass: "tech123", role: "technician", label: "Technician" },
-  { username: "maint-sup", pass: "maint123", role: "maintenance_supervisor", label: "Maintenance Supervisor" },
-  { username: "prod-sup", pass: "prod123", role: "production_supervisor", label: "Production Supervisor" },
-  { username: "plant-mgr", pass: "plant123", role: "plant_manager", label: "Plant Manager" },
+  { username: "maint-sup", pass: "maint123", role: "maintenance_supervisor", label: "Maint Sup" },
+  { username: "prod-sup", pass: "prod123", role: "production_supervisor", label: "Prod Sup" },
+  { username: "plant-mgr", pass: "plant123", role: "plant_manager", label: "Plant Mgr" },
 ];
 
-export function LoginPage({ onLogin }: LoginPageProps) {
+export function LoginPage({ onLogin, onBack }: LoginPageProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -46,20 +48,36 @@ export function LoginPage({ onLogin }: LoginPageProps) {
   }
 
   return (
-    <div className="login-page">
-      <div className="login-card">
-        <header className="login-header">
-          <h1>AM&amp;POP</h1>
-          <p className="tagline">AI can act. AM&amp;POP decides.</p>
-          <span className="login-subtitle">Sign in to your operational portal</span>
-        </header>
+    <div className="login-page animate-fade">
+      <div className="login-card animate-scale">
+        {onBack && (
+          <button
+            type="button"
+            className="login-back-btn"
+            onClick={onBack}
+            aria-label="Back to intro"
+          >
+            ← Back
+          </button>
+        )}
+
+        <div className="login-logo">
+          AM<span>&</span>POP
+        </div>
+        <p className="login-tagline">AI can act. AM&amp;POP decides.</p>
 
         <form onSubmit={handleSubmit} className="login-form">
-          {error && <div className="error-box">{error}</div>}
+          {error && (
+            <div className="login-error">
+              <IconAlert size={16} />
+              <span>{error}</span>
+            </div>
+          )}
 
-          <label>
-            Username
+          <div className="login-field">
+            <label htmlFor="login-username">Username</label>
             <input
+              id="login-username"
               type="text"
               autoComplete="username"
               placeholder="e.g. tech-1"
@@ -68,11 +86,12 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               disabled={loading}
               required
             />
-          </label>
+          </div>
 
-          <label>
-            Password
+          <div className="login-field">
+            <label htmlFor="login-password">Password</label>
             <input
+              id="login-password"
               type="password"
               autoComplete="current-password"
               placeholder="••••••••"
@@ -81,12 +100,16 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               disabled={loading}
               required
             />
-          </label>
+          </div>
 
-          <button type="submit" disabled={loading || !username.trim() || !password}>
+          <button
+            type="submit"
+            className="login-btn"
+            disabled={loading || !username.trim() || !password}
+          >
             {loading ? (
               <>
-                <span className="spinner" /> Signing in…
+                <IconSpinner size={16} /> Signing in…
               </>
             ) : (
               "Sign In"
@@ -94,25 +117,20 @@ export function LoginPage({ onLogin }: LoginPageProps) {
           </button>
         </form>
 
-        <div className="demo-credentials-section">
-          <h3>Demo Credentials</h3>
-          <p className="demo-hint">Click any user to auto-populate credentials:</p>
-          <div className="demo-users-grid">
+        <div className="login-demo">
+          <h4>Quick Login</h4>
+          <div>
             {DEMO_USERS.map((u) => (
-              <button
+              <div
                 key={u.username}
-                type="button"
-                className="demo-user-btn"
+                className="demo-row"
                 onClick={() => handleSelectDemoUser(u)}
+                title={`Click to fill credentials for ${u.label}`}
               >
-                <div className="demo-user-title">
-                  <strong>{u.label}</strong>
-                  <span className="role-badge role-badge-small">{u.role}</span>
-                </div>
-                <div className="demo-user-creds">
-                  <code>{u.username}</code> / <code>{u.pass}</code>
-                </div>
-              </button>
+                <span>{u.username}</span>
+                <span>{u.pass}</span>
+                <span className="role">{u.label}</span>
+              </div>
             ))}
           </div>
         </div>

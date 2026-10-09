@@ -7,6 +7,17 @@ import {
   type User,
   type Complaint,
 } from "../api";
+import {
+  IconCheck,
+  IconX,
+  IconClock,
+  IconShield,
+  IconTrending,
+  IconList,
+  IconSpinner,
+  IconLogout,
+  IconClipboard,
+} from "../components/Icons";
 
 interface ApproverPageProps {
   user: User;
@@ -19,6 +30,64 @@ const CANDIDATE_ACTIONS = [
   { id: "C", type: "REDUCE_PROD", desc: "Reduce production load until maintenance" },
   { id: "D", type: "REALLOCATE", desc: "Reallocate work to another production line" },
 ];
+
+const ROLE_STATUS_MAP: Record<string, string> = {
+  maintenance_supervisor: "PENDING_MAINT",
+  production_supervisor: "PENDING_PROD",
+  plant_manager: "PENDING_PLANT",
+};
+
+function formatRole(role: string): string {
+  switch (role) {
+    case "technician":
+      return "Technician";
+    case "maintenance_supervisor":
+      return "Maintenance Supervisor";
+    case "production_supervisor":
+      return "Production Supervisor";
+    case "plant_manager":
+      return "Plant Manager";
+    default:
+      return role.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+}
+
+function StatusBadge({ status }: { status: string }) {
+  let badgeClass = "status-badge";
+  let label = status;
+
+  if (status === "APPROVED") {
+    badgeClass += " approved";
+    label = "Approved";
+  } else if (status === "REJECTED") {
+    badgeClass += " rejected";
+    label = "Rejected";
+  } else if (status === "PENDING_MAINT") {
+    badgeClass += " pending";
+    label = "Pending Maint";
+  } else if (status === "PENDING_PROD") {
+    badgeClass += " pending";
+    label = "Pending Prod";
+  } else if (status === "PENDING_PLANT") {
+    badgeClass += " pending";
+    label = "Pending Plant";
+  } else {
+    badgeClass += " pending";
+  }
+
+  return (
+    <span className={badgeClass}>
+      {status === "APPROVED" ? (
+        <IconCheck size={10} />
+      ) : status === "REJECTED" ? (
+        <IconX size={10} />
+      ) : (
+        <IconClock size={10} />
+      )}
+      {label}
+    </span>
+  );
+}
 
 export function ApproverPage({ user, onLogout }: ApproverPageProps) {
   const [complaints, setComplaints] = useState<Complaint[]>([]);
@@ -83,7 +152,6 @@ export function ApproverPage({ user, onLogout }: ApproverPageProps) {
         prev.map((c) => (c.complaint_id === updated.complaint_id ? updated : c))
       );
       setInfoMsg("Approval recorded successfully.");
-      // Refresh list to update role-pending queue
       await fetchComplaints();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
@@ -112,353 +180,448 @@ export function ApproverPage({ user, onLogout }: ApproverPageProps) {
     }
   }
 
-  function getStepLabel(status: string) {
-    switch (status) {
-      case "PENDING_MAINT":
-        return "Maintenance Supervisor";
-      case "PENDING_PROD":
-        return "Production Supervisor";
-      case "PENDING_PLANT":
-        return "Plant Manager";
-      case "APPROVED":
-        return "Approved";
-      case "REJECTED":
-        return "Rejected";
-      default:
-        return status;
-    }
-  }
-
-  function renderStatusBadge(status: string) {
-    let badgeClass = "status-badge";
-    if (status === "APPROVED") badgeClass += " status-approved";
-    else if (status === "REJECTED") badgeClass += " status-rejected";
-    else badgeClass += " status-pending";
-
-    return <span className={badgeClass}>{getStepLabel(status)}</span>;
-  }
-
   const isRoleMatchingPending = selectedComplaint
     ? (user.role === "maintenance_supervisor" && selectedComplaint.status === "PENDING_MAINT") ||
       (user.role === "production_supervisor" && selectedComplaint.status === "PENDING_PROD") ||
       (user.role === "plant_manager" && selectedComplaint.status === "PENDING_PLANT")
     : false;
 
+  const chainRoles =
+    selectedComplaint && selectedComplaint.approval_chain.length > 0
+      ? selectedComplaint.approval_chain
+      : ["maintenance_supervisor", "production_supervisor", "plant_manager"];
+
   return (
-    <div className="container">
-      <header className="page-header">
-        <div>
-          <h1>AM&amp;POP Approver Portal</h1>
-          <p>Autonomous Maintenance &amp; Planning Optimization Platform</p>
-        </div>
-        <div className="user-profile-bar">
-          <div className="user-info">
-            <span className="user-name">{user.username}</span>
-            <span className="role-badge">{user.role}</span>
+    <div className="app-shell animate-fade">
+      {/* Top App Bar */}
+      <header className="app-bar">
+        <div className="app-bar-left">
+          <div className="app-logo">
+            AM<span>&</span>POP
           </div>
-          <button type="button" className="btn-secondary" onClick={onLogout}>
-            Logout
+          <span className="role-badge">{formatRole(user.role)}</span>
+        </div>
+        <div className="app-bar-right">
+          <div className="user-chip">
+            <div className="user-avatar">{user.username.slice(0, 1)}</div>
+            <span>{user.username}</span>
+          </div>
+          <button type="button" className="logout-btn" onClick={onLogout}>
+            <IconLogout size={14} /> Logout
           </button>
         </div>
       </header>
 
-      {error && <div className="error-box">{error}</div>}
-      {infoMsg && <div className="success-box">{infoMsg}</div>}
+      {/* Main Page Area */}
+      <main className="page-main" style={{ maxWidth: "1200px" }}>
+        <div className="page-header">
+          <h1 className="page-title">Approval Queue</h1>
+          <p className="page-subtitle">
+            Inspect automated decision intelligence and authorize operational actions.
+          </p>
+        </div>
 
-      <div className="approver-layout">
-        {/* Left column: Pending Complaints */}
-        <section className="approver-sidebar">
-          <div className="section-header-row">
-            <h2>Pending Complaints</h2>
-            <button
-              type="button"
-              className="btn-refresh"
-              onClick={fetchComplaints}
-              disabled={loadingList}
-            >
-              {loadingList ? "…" : "↻"}
-            </button>
+        {error && (
+          <div className="login-error" style={{ marginBottom: "16px" }}>
+            <span>{error}</span>
+          </div>
+        )}
+        {infoMsg && (
+          <div className="toast" style={{ position: "static", marginBottom: "16px" }}>
+            <span className="text-success">{infoMsg}</span>
+          </div>
+        )}
+
+        <div className="approver-layout">
+          {/* Card 1: Pending complaints list */}
+          <div className="card" style={{ marginBottom: 0 }}>
+            <div className="card-header">
+              <div className="card-title">
+                <IconList size={18} /> Pending Review Queue
+              </div>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={fetchComplaints}
+                disabled={loadingList}
+                style={{ padding: "4px 8px" }}
+              >
+                {loadingList ? "…" : "↻"}
+              </button>
+            </div>
+
+            {loadingList && complaints.length === 0 ? (
+              <p className="text-muted">Loading pending queue…</p>
+            ) : complaints.length === 0 ? (
+              <div className="empty-state">
+                <IconShield size={32} />
+                <p>All clear. No complaints waiting for your approval.</p>
+              </div>
+            ) : (
+              <div className="complaint-list">
+                {complaints.map((item) => {
+                  const isSelected = item.complaint_id === selectedId;
+                  return (
+                    <div
+                      key={item.complaint_id}
+                      className={`complaint-item ${isSelected ? "selected" : ""}`}
+                      data-status={item.status}
+                      onClick={() => {
+                        setSelectedId(item.complaint_id);
+                        setError(null);
+                        setInfoMsg(null);
+                      }}
+                    >
+                      <div>
+                        <div className="complaint-id">#{item.complaint_id.slice(0, 8)}</div>
+                        <div className="complaint-title">
+                          {item.machine_id} — {item.problem_type}
+                        </div>
+                        <div className="complaint-meta">
+                          By {item.submitted_by} · {new Date(item.submitted_at).toLocaleTimeString()}
+                        </div>
+                      </div>
+                      <div className="badge-row">
+                        <span className="severity-badge" data-sev={item.severity}>
+                          {item.severity}
+                        </span>
+                        <StatusBadge status={item.status} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          {loadingList && complaints.length === 0 ? (
-            <p className="loading-text">Loading complaints…</p>
-          ) : complaints.length === 0 ? (
-            <p className="empty-text">No pending complaints for your role.</p>
-          ) : (
-            <div className="complaint-list">
-              {complaints.map((item) => {
-                const isSelected = item.complaint_id === selectedId;
-                return (
-                  <div
-                    key={item.complaint_id}
-                    className={`complaint-card selectable ${isSelected ? "selected" : ""}`}
-                    onClick={() => {
-                      setSelectedId(item.complaint_id);
-                      setError(null);
-                      setInfoMsg(null);
-                    }}
-                  >
-                    <div className="complaint-card-header">
-                      <span className="complaint-machine">{item.machine_id}</span>
-                      {renderStatusBadge(item.status)}
+          {/* Card 2: Detail panel when one is selected */}
+          <div className="card" style={{ marginBottom: 0 }}>
+            {selectedComplaint ? (
+              <div>
+                <div className="card-header">
+                  <div>
+                    <div className="card-title" style={{ fontSize: "18px" }}>
+                      Equipment Complaint: {selectedComplaint.machine_id}
                     </div>
-                    <div className="complaint-card-body">
-                      <span className="complaint-problem">{item.problem_type}</span>
-                      <span className={`severity-tag severity-${item.severity.toLowerCase()}`}>
-                        {item.severity}
-                      </span>
-                    </div>
-                    <div className="complaint-card-footer">
-                      <small>By: {item.submitted_by}</small>
-                      <small>{new Date(item.submitted_at).toLocaleTimeString()}</small>
+                    <div className="complaint-meta" style={{ marginTop: "4px" }}>
+                      Reported by <strong>{selectedComplaint.submitted_by}</strong> on{" "}
+                      {new Date(selectedComplaint.submitted_at).toLocaleString()}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
-
-        {/* Right column: Complaint Detail Panel */}
-        <section className="detail-panel">
-          {selectedComplaint ? (
-            <>
-              <div className="detail-header">
-                <div>
-                  <h2>Complaint: {selectedComplaint.machine_id}</h2>
-                  <p className="detail-meta">
-                    Reported by <strong>{selectedComplaint.submitted_by}</strong> on{" "}
-                    {new Date(selectedComplaint.submitted_at).toLocaleString()}
-                  </p>
+                  <StatusBadge status={selectedComplaint.status} />
                 </div>
-                <div>{renderStatusBadge(selectedComplaint.status)}</div>
-              </div>
 
-              <div className="detail-grid">
-                <div className="detail-field">
-                  <span className="label">Problem Type</span>
-                  <span className="value">{selectedComplaint.problem_type}</span>
-                </div>
-                <div className="detail-field">
-                  <span className="label">Severity</span>
-                  <span className="value">
-                    <span className={`severity-tag severity-${selectedComplaint.severity.toLowerCase()}`}>
-                      {selectedComplaint.severity}
+                {/* Complaint Info Grid */}
+                <div className="detail-grid">
+                  <div className="detail-field">
+                    <span className="detail-label">Machine ID</span>
+                    <span className="detail-value">{selectedComplaint.machine_id}</span>
+                  </div>
+                  <div className="detail-field">
+                    <span className="detail-label">Problem Type</span>
+                    <span className="detail-value">{selectedComplaint.problem_type}</span>
+                  </div>
+                  <div className="detail-field">
+                    <span className="detail-label">Severity Level</span>
+                    <span className="detail-value">
+                      <span className="severity-badge" data-sev={selectedComplaint.severity}>
+                        {selectedComplaint.severity}
+                      </span>
                     </span>
-                  </span>
-                </div>
-                <div className="detail-field full-width">
-                  <span className="label">Operational Notes</span>
-                  <p className="notes-box">{selectedComplaint.notes || "No notes provided."}</p>
-                </div>
-              </div>
-
-              {/* AI Decision Section */}
-              <div className="decision-section">
-                <h3>AM&amp;POP Decision Intelligence</h3>
-
-                {!selectedComplaint.decision ? (
-                  <div className="decision-pending-box">
-                    <p>No decision has been evaluated yet for this complaint.</p>
-                    {user.role === "maintenance_supervisor" ? (
-                      <button
-                        type="button"
-                        className="btn-evaluate"
-                        onClick={handleEvaluate}
-                        disabled={actionLoading}
-                      >
-                        {actionLoading ? (
-                          <>
-                            <span className="spinner" /> Running AI Decision Loop…
-                          </>
-                        ) : (
-                          "⚡ Evaluate with AI Engine"
-                        )}
-                      </button>
-                    ) : (
-                      <p className="waiting-text">
-                        Waiting for Maintenance Supervisor to trigger AI evaluation.
-                      </p>
-                    )}
                   </div>
-                ) : (
-                  <div className="decision-card">
-                    <div className="decision-metrics-grid">
-                      <div className="metric-box">
-                        <span className="metric-label">Recommended Action</span>
-                        <span className="metric-value highlight">
-                          {selectedComplaint.decision.recommended_action_id}
-                        </span>
-                      </div>
-                      <div className="metric-box">
-                        <span className="metric-label">Estimated Cost</span>
-                        <span className="metric-value">
-                          ₹{Number(selectedComplaint.decision.expected_cost || 0).toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="metric-box">
-                        <span className="metric-label">Expected Downtime</span>
-                        <span className="metric-value">
-                          {selectedComplaint.decision.expected_downtime} hrs
-                        </span>
-                      </div>
-                      <div className="metric-box">
-                        <span className="metric-label">Risk Level</span>
-                        <span className="metric-value">
-                          {selectedComplaint.decision.expected_risk}
-                        </span>
-                      </div>
-                      <div className="metric-box">
-                        <span className="metric-label">Model Confidence</span>
-                        <span className="metric-value">
-                          {selectedComplaint.decision.confidence !== undefined
-                            ? `${(selectedComplaint.decision.confidence * 100).toFixed(1)}%`
-                            : "—"}
-                        </span>
-                      </div>
-                    </div>
-
-                    {selectedComplaint.decision.reason && (
-                      <p className="reason-text">
-                        <strong>Optimizer Rationale:</strong> {selectedComplaint.decision.reason}
-                      </p>
-                    )}
-
-                    {/* Alternatives Table */}
-                    <div className="alternatives-section">
-                      <h4>Action Candidates &amp; Alternatives</h4>
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>Action ID</th>
-                            <th>Action Type</th>
-                            <th>Description</th>
-                            <th>Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {CANDIDATE_ACTIONS.map((cand) => {
-                            const isRecommended =
-                              cand.id === selectedComplaint.decision?.recommended_action_id;
-                            return (
-                              <tr key={cand.id} className={isRecommended ? "best" : ""}>
-                                <td>
-                                  <strong>{cand.id}</strong> {isRecommended && "★"}
-                                </td>
-                                <td>
-                                  <code>{cand.type}</code>
-                                </td>
-                                <td>{cand.desc}</td>
-                                <td>
-                                  {isRecommended ? (
-                                    <span className="text-success">Optimal Choice</span>
-                                  ) : (
-                                    <span className="text-muted">Alternative</span>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                  <div className="detail-field">
+                    <span className="detail-label">Complaint ID</span>
+                    <span className="detail-value" style={{ fontFamily: "var(--font-mono)", fontSize: "12px" }}>
+                      {selectedComplaint.complaint_id}
+                    </span>
+                  </div>
+                  <div className="detail-field full">
+                    <span className="detail-label">Technician Notes</span>
+                    <div
+                      style={{
+                        padding: "10px 12px",
+                        background: "var(--bg-elevated)",
+                        borderRadius: "var(--radius-md)",
+                        fontSize: "13px",
+                        color: "var(--text-secondary)",
+                      }}
+                    >
+                      {selectedComplaint.notes || "No notes provided."}
                     </div>
                   </div>
-                )}
-              </div>
+                </div>
 
-              {/* Approval History */}
-              {selectedComplaint.approvals && selectedComplaint.approvals.length > 0 && (
-                <div className="approval-history">
-                  <h3>Approval History</h3>
-                  <ul>
-                    {selectedComplaint.approvals.map((appr, index) => (
-                      <li key={index} className="approval-history-item">
-                        <div className="approval-history-header">
-                          <span
-                            className={
-                              appr.action === "APPROVED" ? "text-success" : "text-danger"
-                            }
-                          >
-                            {appr.action}
-                          </span>
-                          <span className="approval-user">
-                            by <strong>{appr.username}</strong> ({appr.role})
-                          </span>
-                          <span className="approval-time">
-                            {new Date(appr.timestamp).toLocaleString()}
-                          </span>
+                {/* Decision Section */}
+                <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1px solid var(--border-subtle)" }}>
+                  <div className="card-title" style={{ marginBottom: "16px" }}>
+                    <IconTrending size={18} /> AM&amp;POP Decision Intelligence
+                  </div>
+
+                  {!selectedComplaint.decision ? (
+                    <div className="empty-state">
+                      <p style={{ marginBottom: "16px" }}>
+                        No automated decision has been evaluated yet for this complaint.
+                      </p>
+                      {user.role === "maintenance_supervisor" ? (
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          onClick={handleEvaluate}
+                          disabled={actionLoading}
+                        >
+                          {actionLoading ? (
+                            <>
+                              <IconSpinner size={16} /> Evaluating Decision Loop…
+                            </>
+                          ) : (
+                            "⚡ Evaluate with AI Engine"
+                          )}
+                        </button>
+                      ) : (
+                        <p className="text-muted" style={{ fontStyle: "italic", fontSize: "13px" }}>
+                          Waiting for Maintenance Supervisor to trigger AI evaluation.
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      {/* Metric stat blocks: 4-column grid */}
+                      <div className="metric-grid">
+                        <div className="metric-block">
+                          <div className="metric-label">Downtime</div>
+                          <div className="metric-value">
+                            {selectedComplaint.decision.expected_downtime}
+                            <span className="metric-unit">h</span>
+                          </div>
                         </div>
-                        {appr.comment && (
-                          <div className="approval-comment">"{appr.comment}"</div>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+                        <div className="metric-block">
+                          <div className="metric-label">Cost</div>
+                          <div className="metric-value">
+                            ₹{Number(selectedComplaint.decision.expected_cost || 0).toLocaleString()}
+                          </div>
+                        </div>
+                        <div className="metric-block">
+                          <div className="metric-label">Risk</div>
+                          <div className="metric-value">
+                            {selectedComplaint.decision.expected_risk}
+                          </div>
+                        </div>
+                        <div className="metric-block">
+                          <div className="metric-label">Confidence</div>
+                          <div className="metric-value">
+                            {selectedComplaint.decision.confidence !== undefined
+                              ? `${(selectedComplaint.decision.confidence * 100).toFixed(0)}%`
+                              : "—"}
+                          </div>
+                        </div>
+                      </div>
 
-              {/* Human-in-the-Loop Action Form */}
-              <div className="approval-action-card">
-                <h3>Manager Decision</h3>
+                      {selectedComplaint.decision.reason && (
+                        <div
+                          style={{
+                            padding: "12px 14px",
+                            background: "var(--bg-elevated)",
+                            borderLeft: "3px solid var(--brand)",
+                            borderRadius: "var(--radius-sm)",
+                            fontSize: "13px",
+                            color: "var(--text-secondary)",
+                            margin: "16px 0",
+                          }}
+                        >
+                          <strong>Recommendation Rationale:</strong> Action{" "}
+                          <code>{selectedComplaint.decision.recommended_action_id}</code>:{" "}
+                          {selectedComplaint.decision.reason}
+                        </div>
+                      )}
 
-                {isRoleMatchingPending ? (
-                  <div className="approval-form">
-                    <label>
-                      Decision Comments / Operational Instructions
-                      <textarea
-                        rows={2}
-                        placeholder="Add remarks or requirements for this decision..."
-                        value={comment}
-                        onChange={(e) => setComment(e.target.value)}
-                        disabled={actionLoading}
-                      />
-                    </label>
-
-                    <div className="action-buttons-row">
-                      <button
-                        type="button"
-                        className="btn-approve"
-                        onClick={handleApprove}
-                        disabled={actionLoading}
-                      >
-                        {actionLoading ? "Processing…" : "✓ Approve Action"}
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-reject"
-                        onClick={handleReject}
-                        disabled={actionLoading}
-                      >
-                        {actionLoading ? "Processing…" : "✕ Reject"}
-                      </button>
+                      {/* Alternatives Table */}
+                      <div style={{ marginTop: "16px" }}>
+                        <div className="detail-label" style={{ marginBottom: "8px" }}>
+                          Candidate Alternatives
+                        </div>
+                        <table className="data-table">
+                          <thead>
+                            <tr>
+                              <th>Action</th>
+                              <th>Type</th>
+                              <th>Description</th>
+                              <th>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {CANDIDATE_ACTIONS.map((cand) => {
+                              const isRecommended =
+                                cand.id === selectedComplaint.decision?.recommended_action_id;
+                              return (
+                                <tr key={cand.id} className={isRecommended ? "best" : ""}>
+                                  <td>
+                                    <strong>{cand.id}</strong> {isRecommended && "★"}
+                                  </td>
+                                  <td>
+                                    <code style={{ color: "var(--brand)" }}>{cand.type}</code>
+                                  </td>
+                                  <td>{cand.desc}</td>
+                                  <td>
+                                    {isRecommended ? (
+                                      <span className="text-success">Optimal Choice</span>
+                                    ) : (
+                                      <span className="text-muted">Alternative</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
+                  )}
+                </div>
+
+                {/* Timeline: Approval Chain */}
+                <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1px solid var(--border-subtle)" }}>
+                  <div className="card-title" style={{ marginBottom: "16px" }}>
+                    <IconShield size={18} /> Multi-Tier Approval Chain
                   </div>
-                ) : (
-                  <div className="waiting-banner">
-                    {selectedComplaint.status === "APPROVED" ? (
-                      <span className="text-success">
-                        ✓ This maintenance decision has been fully APPROVED.
-                      </span>
-                    ) : selectedComplaint.status === "REJECTED" ? (
-                      <span className="text-danger">
-                        ✕ This complaint was REJECTED during review.
-                      </span>
-                    ) : (
-                      <span>
-                        ⏳ Waiting for <strong>{getStepLabel(selectedComplaint.status)}</strong>
-                      </span>
-                    )}
+                  <div className="timeline">
+                    {chainRoles.map((role) => {
+                      const done = selectedComplaint.approvals.some(
+                        (a) => a.role === role && a.action === "APPROVED"
+                      );
+                      const rejected = selectedComplaint.approvals.some(
+                        (a) => a.role === role && a.action === "REJECTED"
+                      );
+                      const current =
+                        !done && !rejected && selectedComplaint.status === ROLE_STATUS_MAP[role];
+                      const approvalEntry = selectedComplaint.approvals.find((a) => a.role === role);
+
+                      return (
+                        <div className="timeline-item" key={role}>
+                          <div
+                            className={`timeline-dot ${
+                              done ? "done" : rejected ? "rejected" : current ? "current" : "pending"
+                            }`}
+                          >
+                            {done ? <IconCheck size={12} /> : rejected ? <IconX size={12} /> : null}
+                          </div>
+                          <div>
+                            <strong>{formatRole(role)}</strong>{" "}
+                            {done
+                              ? `· approved by ${approvalEntry?.username}`
+                              : rejected
+                              ? `· rejected by ${approvalEntry?.username}`
+                              : current
+                              ? "· awaiting review now"
+                              : "· pending next tier"}
+                            {approvalEntry?.comment && (
+                              <div
+                                style={{
+                                  fontSize: "12px",
+                                  color: "var(--text-muted)",
+                                  fontStyle: "italic",
+                                  marginTop: "2px",
+                                }}
+                              >
+                                "{approvalEntry.comment}"
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                )}
+                </div>
+
+                {/* Decision Actions / Authorizations */}
+                <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1px solid var(--border-subtle)" }}>
+                  <div className="card-title" style={{ marginBottom: "12px" }}>
+                    Supervisor Authorization
+                  </div>
+
+                  {isRoleMatchingPending ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                      <div className="form-field">
+                        <label className="form-label">Review Remarks / Conditions</label>
+                        <textarea
+                          className="form-textarea"
+                          rows={2}
+                          placeholder="Add approval comments or operational conditions..."
+                          value={comment}
+                          onChange={(e) => setComment(e.target.value)}
+                          disabled={actionLoading}
+                        />
+                      </div>
+
+                      <div style={{ display: "flex", gap: "12px" }}>
+                        <button
+                          type="button"
+                          className="btn-success"
+                          onClick={handleApprove}
+                          disabled={actionLoading}
+                        >
+                          {actionLoading ? (
+                            <>
+                              <IconSpinner size={16} /> Processing…
+                            </>
+                          ) : (
+                            <>
+                              <IconCheck size={16} /> Approve Decision
+                            </>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-danger"
+                          onClick={handleReject}
+                          disabled={actionLoading}
+                        >
+                          {actionLoading ? (
+                            <>
+                              <IconSpinner size={16} /> Processing…
+                            </>
+                          ) : (
+                            <>
+                              <IconX size={16} /> Reject Decision
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        padding: "14px 16px",
+                        background: "var(--bg-elevated)",
+                        borderRadius: "var(--radius-md)",
+                        fontSize: "13px",
+                      }}
+                    >
+                      {selectedComplaint.status === "APPROVED" ? (
+                        <span className="text-success">
+                          ✓ This maintenance decision has been fully APPROVED by all required tiers.
+                        </span>
+                      ) : selectedComplaint.status === "REJECTED" ? (
+                        <span className="text-danger">
+                          ✕ This maintenance complaint was REJECTED during supervisor review.
+                        </span>
+                      ) : (
+                        <span className="text-secondary">
+                          ⏳ Waiting for <strong>{formatRole(selectedComplaint.status.replace("PENDING_", "").toLowerCase())}</strong> review.
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-            </>
-          ) : (
-            <div className="detail-empty">
-              <p>Select a complaint from the pending list to review details and approve.</p>
-            </div>
-          )}
-        </section>
-      </div>
+            ) : (
+              <div className="empty-state">
+                <IconClipboard size={32} />
+                <p>Select a complaint from the queue to view details and authorize.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
     </div>
   );
 }

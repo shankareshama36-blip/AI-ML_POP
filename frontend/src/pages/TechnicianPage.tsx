@@ -5,6 +5,16 @@ import {
   type User,
   type Complaint,
 } from "../api";
+import {
+  IconPlus,
+  IconList,
+  IconClipboard,
+  IconCheck,
+  IconX,
+  IconClock,
+  IconSpinner,
+  IconLogout,
+} from "../components/Icons";
 
 interface TechnicianPageProps {
   user: User;
@@ -34,6 +44,43 @@ const PROBLEM_OPTIONS = [
 ];
 
 const SEVERITY_OPTIONS = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+
+function StatusBadge({ status }: { status: string }) {
+  let badgeClass = "status-badge";
+  let label = status;
+
+  if (status === "APPROVED") {
+    badgeClass += " approved";
+    label = "Approved";
+  } else if (status === "REJECTED") {
+    badgeClass += " rejected";
+    label = "Rejected";
+  } else if (status === "PENDING_MAINT") {
+    badgeClass += " pending";
+    label = "Pending Maint";
+  } else if (status === "PENDING_PROD") {
+    badgeClass += " pending";
+    label = "Pending Prod";
+  } else if (status === "PENDING_PLANT") {
+    badgeClass += " pending";
+    label = "Pending Plant Mgr";
+  } else {
+    badgeClass += " pending";
+  }
+
+  return (
+    <span className={badgeClass}>
+      {status === "APPROVED" ? (
+        <IconCheck size={10} />
+      ) : status === "REJECTED" ? (
+        <IconX size={10} />
+      ) : (
+        <IconClock size={10} />
+      )}
+      {label}
+    </span>
+  );
+}
 
 export function TechnicianPage({ user, onLogout }: TechnicianPageProps) {
   const [complaints, setComplaints] = useState<Complaint[]>([]);
@@ -111,60 +158,60 @@ export function TechnicianPage({ user, onLogout }: TechnicianPageProps) {
     }
   }
 
-  function renderStatusBadge(status: string) {
-    let badgeClass = "status-badge";
-    let label = status;
-
-    if (status === "APPROVED") {
-      badgeClass += " status-approved";
-      label = "Approved";
-    } else if (status === "REJECTED") {
-      badgeClass += " status-rejected";
-      label = "Rejected";
-    } else if (status === "PENDING_MAINT") {
-      badgeClass += " status-pending";
-      label = "Pending Maintenance";
-    } else if (status === "PENDING_PROD") {
-      badgeClass += " status-pending";
-      label = "Pending Production";
-    } else if (status === "PENDING_PLANT") {
-      badgeClass += " status-pending";
-      label = "Pending Plant Mgr";
-    } else {
-      badgeClass += " status-pending";
-    }
-
-    return <span className={badgeClass}>{label}</span>;
-  }
-
   return (
-    <div className="container">
-      <header className="page-header">
-        <div>
-          <h1>AM&amp;POP Technician Portal</h1>
-          <p>Autonomous Maintenance &amp; Planning Optimization Platform</p>
-        </div>
-        <div className="user-profile-bar">
-          <div className="user-info">
-            <span className="user-name">{user.username}</span>
-            <span className="role-badge">{user.role}</span>
+    <div className="app-shell animate-fade">
+      {/* Top App Bar */}
+      <header className="app-bar">
+        <div className="app-bar-left">
+          <div className="app-logo">
+            AM<span>&</span>POP
           </div>
-          <button type="button" className="btn-secondary" onClick={onLogout}>
-            Logout
+          <span className="role-badge">Technician</span>
+        </div>
+        <div className="app-bar-right">
+          <div className="user-chip">
+            <div className="user-avatar">{user.username.slice(0, 1)}</div>
+            <span>{user.username}</span>
+          </div>
+          <button type="button" className="logout-btn" onClick={onLogout}>
+            <IconLogout size={14} /> Logout
           </button>
         </div>
       </header>
 
-      <section className="form-section">
-        <h2>Submit New Maintenance Complaint</h2>
-        <form onSubmit={handleSubmit}>
-          {error && <div className="error-box">{error}</div>}
-          {successMsg && <div className="success-box">{successMsg}</div>}
+      {/* Main Page Area */}
+      <main className="page-main">
+        <div className="page-header">
+          <h1 className="page-title">Technician Dashboard</h1>
+          <p className="page-subtitle">
+            Report machine issues and track their automated resolution workflow.
+          </p>
+        </div>
 
-          <div className="grid">
-            <label>
-              Machine ID
+        {/* Section 1: Report New Complaint Card */}
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">
+              <IconPlus size={18} /> Report New Complaint
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="form-grid">
+            {error && (
+              <div className="login-error" style={{ gridColumn: "1 / -1" }}>
+                <span>{error}</span>
+              </div>
+            )}
+            {successMsg && (
+              <div className="toast" style={{ position: "static", gridColumn: "1 / -1" }}>
+                <span className="text-success">{successMsg}</span>
+              </div>
+            )}
+
+            <div className="form-field">
+              <label className="form-label">Machine ID</label>
               <select
+                className="form-select"
                 value={selectedMachine}
                 onChange={(e) => setSelectedMachine(e.target.value)}
               >
@@ -177,18 +224,20 @@ export function TechnicianPage({ user, onLogout }: TechnicianPageProps) {
               {selectedMachine === "Other" && (
                 <input
                   type="text"
+                  className="form-input animate-slide-up"
                   placeholder="Enter Machine ID (e.g. M-999)"
                   value={customMachine}
                   onChange={(e) => setCustomMachine(e.target.value)}
-                  style={{ marginTop: "6px" }}
+                  style={{ marginTop: "8px" }}
                   required
                 />
               )}
-            </label>
+            </div>
 
-            <label>
-              Problem Type
+            <div className="form-field">
+              <label className="form-label">Problem Type</label>
               <select
+                className="form-select"
                 value={selectedProblem}
                 onChange={(e) => setSelectedProblem(e.target.value)}
               >
@@ -201,18 +250,20 @@ export function TechnicianPage({ user, onLogout }: TechnicianPageProps) {
               {selectedProblem === "Other" && (
                 <input
                   type="text"
-                  placeholder="Enter problem type description"
+                  className="form-input animate-slide-up"
+                  placeholder="Enter custom problem description"
                   value={customProblem}
                   onChange={(e) => setCustomProblem(e.target.value)}
-                  style={{ marginTop: "6px" }}
+                  style={{ marginTop: "8px" }}
                   required
                 />
               )}
-            </label>
+            </div>
 
-            <label>
-              Severity Level
+            <div className="form-field">
+              <label className="form-label">Severity Level</label>
               <select
+                className="form-select"
                 value={severity}
                 onChange={(e) => setSeverity(e.target.value)}
               >
@@ -222,111 +273,121 @@ export function TechnicianPage({ user, onLogout }: TechnicianPageProps) {
                   </option>
                 ))}
               </select>
-            </label>
+            </div>
 
-            <label style={{ gridColumn: "span 2" }}>
-              Operational Notes / Observations
+            <div className="form-field full">
+              <label className="form-label">Operational Notes / Symptoms</label>
               <textarea
+                className="form-textarea"
                 rows={3}
-                placeholder="Describe machine behavior, strange sounds, temperature spikes, or symptoms..."
+                placeholder="Describe machine behavior, abnormal telemetry, unusual noises, or symptoms..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
               />
-            </label>
-          </div>
+            </div>
 
-          <button type="submit" disabled={submitting}>
-            {submitting ? (
-              <>
-                <span className="spinner" /> Submitting Complaint…
-              </>
-            ) : (
-              "Submit Complaint"
-            )}
-          </button>
-        </form>
-      </section>
-
-      <section>
-        <div className="section-header-row">
-          <h2>My Submitted Complaints</h2>
-          <button
-            type="button"
-            className="btn-refresh"
-            onClick={fetchComplaints}
-            disabled={loadingList}
-          >
-            {loadingList ? "Refreshing…" : "↻ Refresh"}
-          </button>
+            <div className="form-field full">
+              <button type="submit" className="btn-primary" disabled={submitting}>
+                {submitting ? (
+                  <>
+                    <IconSpinner size={16} /> Submitting Complaint…
+                  </>
+                ) : (
+                  <>
+                    <IconPlus size={16} /> Submit Complaint
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
         </div>
 
-        {loadingList && complaints.length === 0 ? (
-          <p className="loading-text">Loading your complaints…</p>
-        ) : complaints.length === 0 ? (
-          <p className="empty-text">
-            No complaints submitted yet. Use the form above to report a machine issue.
-          </p>
-        ) : (
+        {/* Section 2: Complaints List Card */}
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">
+              <IconList size={18} /> My Complaints{" "}
+              <span className="status-badge pending">{complaints.length}</span>
+            </div>
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={fetchComplaints}
+              disabled={loadingList}
+            >
+              {loadingList ? "Refreshing…" : "↻ Refresh"}
+            </button>
+          </div>
+
           <div className="complaint-list">
             {complaints.map((item) => (
-              <div key={item.complaint_id} className="complaint-card">
-                <div className="complaint-card-header">
-                  <div className="complaint-title-group">
-                    <span className="complaint-machine">{item.machine_id}</span>
-                    <span className="complaint-problem">{item.problem_type}</span>
-                    <span className={`severity-tag severity-${item.severity.toLowerCase()}`}>
-                      {item.severity}
-                    </span>
+              <div
+                key={item.complaint_id}
+                className="complaint-item"
+                data-status={item.status}
+              >
+                <div>
+                  <div className="complaint-id">#{item.complaint_id.slice(0, 8)}</div>
+                  <div className="complaint-title">
+                    {item.machine_id} — {item.problem_type}
                   </div>
-                  {renderStatusBadge(item.status)}
-                </div>
-
-                {item.notes && <p className="complaint-notes">{item.notes}</p>}
-
-                <div className="complaint-meta-row">
-                  <span>
+                  {item.notes && <div className="complaint-meta">{item.notes}</div>}
+                  <div className="complaint-meta">
                     Submitted: {new Date(item.submitted_at).toLocaleString()}
-                  </span>
-                  <span>ID: {item.complaint_id.slice(0, 8)}…</span>
+                  </div>
+
+                  {item.decision && (
+                    <div className="complaint-decision-mini">
+                      <strong>AI Recommendation:</strong> Action{" "}
+                      <code>{item.decision.recommended_action_id}</code> | Est. Cost: ₹
+                      {Number(item.decision.expected_cost || 0).toLocaleString()} | Downtime:{" "}
+                      {item.decision.expected_downtime}h | Risk:{" "}
+                      {item.decision.expected_risk}
+                    </div>
+                  )}
+
+                  {item.approvals && item.approvals.length > 0 && (
+                    <div className="approval-history-mini">
+                      <strong>Approval Log:</strong>
+                      <ul>
+                        {item.approvals.map((appr, idx) => (
+                          <li key={idx}>
+                            <span
+                              className={
+                                appr.action === "APPROVED"
+                                  ? "text-success"
+                                  : "text-danger"
+                              }
+                            >
+                              {appr.action}
+                            </span>{" "}
+                            by <code>{appr.username}</code> ({appr.role})
+                            {appr.comment ? ` — "${appr.comment}"` : ""}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
 
-                {item.decision && (
-                  <div className="complaint-decision-mini">
-                    <strong>AI Recommendation:</strong> Action{" "}
-                    <code>{item.decision.recommended_action_id}</code> | Est. Cost: ₹
-                    {Number(item.decision.expected_cost || 0).toLocaleString()} | Est.
-                    Downtime: {item.decision.expected_downtime}h | Risk:{" "}
-                    {item.decision.expected_risk}
-                  </div>
-                )}
-
-                {item.approvals && item.approvals.length > 0 && (
-                  <div className="approval-history-mini">
-                    <strong>Approval Log:</strong>
-                    <ul>
-                      {item.approvals.map((appr, idx) => (
-                        <li key={idx}>
-                          <span
-                            className={
-                              appr.action === "APPROVED"
-                                ? "text-success"
-                                : "text-danger"
-                            }
-                          >
-                            {appr.action}
-                          </span>{" "}
-                          by <code>{appr.username}</code> ({appr.role})
-                          {appr.comment ? ` — "${appr.comment}"` : ""}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+                <div className="badge-row">
+                  <span className="severity-badge" data-sev={item.severity}>
+                    {item.severity}
+                  </span>
+                  <StatusBadge status={item.status} />
+                </div>
               </div>
             ))}
           </div>
-        )}
-      </section>
+
+          {complaints.length === 0 && (
+            <div className="empty-state">
+              <IconClipboard size={32} />
+              <p>No complaints yet. Submit your first one above.</p>
+            </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 }
