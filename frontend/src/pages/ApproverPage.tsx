@@ -4,6 +4,7 @@ import {
   evaluateComplaint,
   approveComplaint,
   rejectComplaint,
+  ApiError,
   type User,
   type Complaint,
 } from "../api";
@@ -110,6 +111,7 @@ export function ApproverPage({ user, onLogout }: ApproverPageProps) {
         setSelectedId(data[0]?.complaint_id || null);
       }
     } catch (err: unknown) {
+      if (err instanceof ApiError && err.status === 401) onLogout();
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoadingList(false);
@@ -134,6 +136,7 @@ export function ApproverPage({ user, onLogout }: ApproverPageProps) {
       );
       setInfoMsg("AI evaluation complete. Decision attached.");
     } catch (err: unknown) {
+      if (err instanceof ApiError && err.status === 401) onLogout();
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setActionLoading(false);
@@ -154,6 +157,7 @@ export function ApproverPage({ user, onLogout }: ApproverPageProps) {
       setInfoMsg("Approval recorded successfully.");
       await fetchComplaints();
     } catch (err: unknown) {
+      if (err instanceof ApiError && err.status === 401) onLogout();
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setActionLoading(false);
@@ -174,6 +178,7 @@ export function ApproverPage({ user, onLogout }: ApproverPageProps) {
       setInfoMsg("Complaint rejected.");
       await fetchComplaints();
     } catch (err: unknown) {
+      if (err instanceof ApiError && err.status === 401) onLogout();
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setActionLoading(false);
@@ -203,8 +208,8 @@ export function ApproverPage({ user, onLogout }: ApproverPageProps) {
         </div>
         <div className="app-bar-right">
           <div className="user-chip">
-            <div className="user-avatar">{user.username.slice(0, 1)}</div>
-            <span>{user.username}</span>
+            <div className="user-avatar">{user.email.slice(0, 1)}</div>
+            <span>{user.email}</span>
           </div>
           <button type="button" className="logout-btn" onClick={onLogout}>
             <IconLogout size={14} /> Logout
@@ -606,7 +611,7 @@ export function ApproverPage({ user, onLogout }: ApproverPageProps) {
                         </span>
                       ) : (
                         <span className="text-secondary">
-                          ⏳ Waiting for <strong>{formatRole(selectedComplaint.status.replace("PENDING_", "").toLowerCase())}</strong> review.
+                          ⏳ Waiting for <strong>{formatRole(chainRoles.find((role) => ROLE_STATUS_MAP[role] === selectedComplaint.status) || "")}</strong> approval.
                         </span>
                       )}
                     </div>

@@ -1,58 +1,66 @@
 import { useState, useEffect } from "react";
-import { type User } from "./api";
+import { logout, verifyToken, type User } from "./api";
 import { LandingPage } from "./pages/LandingPage";
 import { LoginPage } from "./pages/LoginPage";
+import { SignupPage } from "./pages/SignupPage";
 import { TechnicianPage } from "./pages/TechnicianPage";
 import { ApproverPage } from "./pages/ApproverPage";
 import "./App.css";
 
-const STORAGE_KEY = "am-pop-user";
-
-type View = "landing" | "login" | "app";
+type View = "landing" | "login" | "signup" | "app";
 
 function App() {
   const [view, setView] = useState<View>("landing");
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    try {
-      const saved = sessionStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved) as User;
-        setUser(parsed);
-        setView("app");
-      } else {
-        setView("landing");
+    async function restoreSession() {
+      try {
+        if (localStorage.getItem("am-pop-token")) {
+          const verified = await verifyToken();
+          setUser(verified);
+          localStorage.setItem("am-pop-user", JSON.stringify(verified));
+          setView("app");
+        } else {
+          setView(localStorage.getItem("am-pop-welcome") ? "login" : "landing");
+        }
+      } catch {
+        logout();
+        setView(localStorage.getItem("am-pop-welcome") ? "login" : "landing");
       }
-    } catch {
-      setView("landing");
     }
+    void restoreSession();
   }, []);
 
-  function handleLoginSuccess(authenticatedUser: User) {
+  function handleLoginSuccess(authenticatedUser: User, token: string) {
     setUser(authenticatedUser);
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(authenticatedUser));
+    localStorage.setItem("am-pop-token", token);
+    localStorage.setItem("am-pop-user", JSON.stringify(authenticatedUser));
+    localStorage.setItem("am-pop-welcome", "true");
     setView("app");
   }
 
   function handleLogout() {
     setUser(null);
-    sessionStorage.removeItem(STORAGE_KEY);
-    setView("landing");
+    logout();
+    setView("login");
   }
 
   return (
     <div className="animate-fade">
       {view === "landing" && (
-        <LandingPage onSignIn={() => setView("login")} />
+        <LandingPage onSignIn={() => setView("login")} onGetStarted={() => setView("signup")} />
       )}
 
       {view === "login" && (
         <LoginPage
           onLogin={handleLoginSuccess}
           onBack={() => setView("landing")}
+          onSignup={() => setView("signup")}
         />
       )}
+
+      {view === "signup" && <SignupPage onSignup={handleLoginSuccess} onSignIn={() => setView("login")} />}
 
       {view === "app" && user && (
         <>

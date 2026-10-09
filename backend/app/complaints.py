@@ -27,13 +27,6 @@ _ROLE_TO_STATUS: dict[str, str] = {
     "plant_manager": "PENDING_PLANT",
 }
 
-_NEXT_STATUS: dict[str, str] = {
-    "PENDING_MAINT": "PENDING_PROD",
-    "PENDING_PROD": "PENDING_PLANT",
-    "PENDING_PLANT": "APPROVED",
-}
-
-
 class ComplaintCreate(BaseModel):
     machine_id: str
     problem_type: str
@@ -130,6 +123,8 @@ def approve_complaint(
         raise ValueError(
             f"Role '{role}' cannot approve a complaint in status '{record.status}'"
         )
+    if role not in record.approval_chain:
+        raise ValueError(f"Role '{role}' is not in the approval chain")
 
     entry = {
         "role": role,
@@ -140,13 +135,12 @@ def approve_complaint(
     }
     new_approvals = record.approvals + [entry]
 
-    next_status = _NEXT_STATUS.get(record.status, "APPROVED")
-
-    # If the chain only has one step the next status might skip unused stages
-    # — advance only through stages that are in the approval chain.
-    chain_statuses = [_ROLE_TO_STATUS[r] for r in record.approval_chain if r in _ROLE_TO_STATUS]
-    if next_status not in chain_statuses and next_status != "APPROVED":
-        next_status = "APPROVED"
+    current_index = record.approval_chain.index(role)
+    next_status = (
+        _ROLE_TO_STATUS[record.approval_chain[current_index + 1]]
+        if current_index + 1 < len(record.approval_chain)
+        else "APPROVED"
+    )
 
     updated = record.model_copy(
         update={"approvals": new_approvals, "status": next_status}

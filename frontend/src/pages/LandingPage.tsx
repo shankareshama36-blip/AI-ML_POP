@@ -13,9 +13,10 @@ import {
 
 interface LandingPageProps {
   onSignIn: () => void;
+  onGetStarted: () => void;
 }
 
-export function LandingPage({ onSignIn }: LandingPageProps) {
+export function LandingPage({ onSignIn, onGetStarted }: LandingPageProps) {
   function scrollToSection(id: string) {
     const el = document.getElementById(id);
     if (el) {
@@ -56,7 +57,7 @@ export function LandingPage({ onSignIn }: LandingPageProps) {
           <button
             type="button"
             className="btn-primary btn-lg"
-            onClick={onSignIn}
+            onClick={onGetStarted}
           >
             Get Started <IconArrowRight size={16} />
           </button>

@@ -11,6 +11,7 @@ from backend.app.core.rate_limit import (
     rate_limit_exceeded_handler,
 )
 from backend.app.core.security import add_security_middleware
+from backend.app.db import init_db
 from backend.app.decision_engine import NoFeasibleActionError, evaluate_decision
 from backend.app.formal_engine import (
     DfaValidationResult,
@@ -39,6 +40,11 @@ add_security_middleware(app)
 
 app.include_router(auth_router)
 app.include_router(complaints_router)
+
+
+@app.on_event("startup")
+def initialise_database() -> None:
+    init_db()
 
 decision_repository = DecisionRepository()
 

@@ -13,6 +13,9 @@ dependencies = [
     "numpy",
     "joblib",
     "slowapi",
+    "sqlalchemy",
+    "bcrypt",
+    "python-jose[cryptography]",
 ]
 
 [project.optional-dependencies]

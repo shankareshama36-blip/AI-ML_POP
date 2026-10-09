@@ -2,6 +2,7 @@ import { useState, useEffect, type FormEvent } from "react";
 import {
   createComplaint,
   listComplaints,
+  ApiError,
   type User,
   type Complaint,
 } from "../api";
@@ -105,6 +106,7 @@ export function TechnicianPage({ user, onLogout }: TechnicianPageProps) {
       const data = await listComplaints(user);
       setComplaints(data);
     } catch (err: unknown) {
+      if (err instanceof ApiError && err.status === 401) onLogout();
       console.error("Failed to fetch complaints:", err);
     } finally {
       setLoadingList(false);
@@ -152,6 +154,7 @@ export function TechnicianPage({ user, onLogout }: TechnicianPageProps) {
       if (selectedProblem === "Other") setCustomProblem("");
       fetchComplaints();
     } catch (err: unknown) {
+      if (err instanceof ApiError && err.status === 401) onLogout();
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSubmitting(false);
@@ -170,8 +173,8 @@ export function TechnicianPage({ user, onLogout }: TechnicianPageProps) {
         </div>
         <div className="app-bar-right">
           <div className="user-chip">
-            <div className="user-avatar">{user.username.slice(0, 1)}</div>
-            <span>{user.username}</span>
+            <div className="user-avatar">{user.email.slice(0, 1)}</div>
+            <span>{user.email}</span>
           </div>
           <button type="button" className="logout-btn" onClick={onLogout}>
             <IconLogout size={14} /> Logout

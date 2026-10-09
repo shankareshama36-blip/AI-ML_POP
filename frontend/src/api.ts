@@ -1,7 +1,8 @@
 const BASE = import.meta.env.VITE_API_BASE_URL || "/api";
 
 export interface User {
-  username: string;
+  id: number;
+  email: string;
   role: string;
 }
 
@@ -131,57 +132,82 @@ export interface DecisionResponse {
   };
 }
 
-export async function login(
-  username: string,
-  password: string
-): Promise<User> {
-  const res = await fetch(`${BASE}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`HTTP ${res.status}: ${text}`);
-  }
-  return res.json();
+export interface AuthResult {
+  token: string;
+  user: User;
 }
 
-function getAuthHeaders(user: User): Record<string, string> {
-  return {
-    "Content-Type": "application/json",
-    "X-Username": user.username,
-    "X-Role": user.role,
-  };
+export class ApiError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = localStorage.getItem("am-pop-token");
+  const headers = new Headers(options.headers);
+  headers.set("Content-Type", "application/json");
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const res = await fetch(`${BASE}${path}`, { ...options, headers });
+  if (!res.ok) throw new ApiError(res.status, await res.text());
+  return res.json() as Promise<T>;
+}
+
+export async function signup(email: string, password: string, role: string): Promise<AuthResult> {
+  return request<AuthResult>("/auth/signup", { method: "POST", body: JSON.stringify({ email, password, role }) });
+}
+
+export async function login(email: string, password: string): Promise<AuthResult> {
+  return request<AuthResult>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+}
+
+export async function verifyToken(): Promise<User> {
+  return (await request<{ user: User }>("/auth/verify", { method: "POST" })).user;
+}
+
+export function logout(): void {
+  localStorage.removeItem("am-pop-token");
+  localStorage.removeItem("am-pop-user");
+}
+
+function getAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem("am-pop-token");
+  return token
+    ? { "Content-Type": "application/json", Authorization: `Bearer ${token}` }
+    : { "Content-Type": "application/json" };
 }
 
 export async function createComplaint(
   payload: ComplaintCreateInput,
   user: User
 ): Promise<Complaint> {
+  void user;
   const res = await fetch(`${BASE}/complaints`, {
     method: "POST",
-    headers: getAuthHeaders(user),
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`HTTP ${res.status}: ${text}`);
+    throw new ApiError(res.status, text);
   }
   return res.json();
 }
 
 export async function listComplaints(user: User): Promise<Complaint[]> {
+  void user;
   const res = await fetch(`${BASE}/complaints`, {
     method: "GET",
-    headers: getAuthHeaders(user),
+    headers: getAuthHeaders(),
   });
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`HTTP ${res.status}: ${text}`);
+    throw new ApiError(res.status, text);
   }
   return res.json();
 }
@@ -190,14 +216,15 @@ export async function getComplaint(
   id: string,
   user: User
 ): Promise<Complaint> {
+  void user;
   const res = await fetch(`${BASE}/complaints/${id}`, {
     method: "GET",
-    headers: getAuthHeaders(user),
+    headers: getAuthHeaders(),
   });
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`HTTP ${res.status}: ${text}`);
+    throw new ApiError(res.status, text);
   }
   return res.json();
 }
@@ -206,14 +233,15 @@ export async function evaluateComplaint(
   id: string,
   user: User
 ): Promise<Complaint> {
+  void user;
   const res = await fetch(`${BASE}/complaints/${id}/evaluate`, {
     method: "POST",
-    headers: getAuthHeaders(user),
+    headers: getAuthHeaders(),
   });
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`HTTP ${res.status}: ${text}`);
+    throw new ApiError(res.status, text);
   }
   return res.json();
 }
@@ -223,15 +251,16 @@ export async function approveComplaint(
   user: User,
   comment: string = ""
 ): Promise<Complaint> {
+  void user;
   const res = await fetch(`${BASE}/complaints/${id}/approve`, {
     method: "POST",
-    headers: getAuthHeaders(user),
+    headers: getAuthHeaders(),
     body: JSON.stringify({ comment }),
   });
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`HTTP ${res.status}: ${text}`);
+    throw new ApiError(res.status, text);
   }
   return res.json();
 }
@@ -241,15 +270,16 @@ export async function rejectComplaint(
   user: User,
   comment: string = ""
 ): Promise<Complaint> {
+  void user;
   const res = await fetch(`${BASE}/complaints/${id}/reject`, {
     method: "POST",
-    headers: getAuthHeaders(user),
+    headers: getAuthHeaders(),
     body: JSON.stringify({ comment }),
   });
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`HTTP ${res.status}: ${text}`);
+    throw new ApiError(res.status, text);
   }
   return res.json();
 }
@@ -265,7 +295,7 @@ export async function evaluateDecision(
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`HTTP ${res.status}: ${text}`);
+    throw new ApiError(res.status, text);
   }
   return res.json();
 }
@@ -285,7 +315,7 @@ export async function approveDecision(
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`HTTP ${res.status}: ${text}`);
+    throw new ApiError(res.status, text);
   }
   return res.json();
 }
