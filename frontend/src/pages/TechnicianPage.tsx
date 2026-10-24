@@ -16,6 +16,7 @@ import {
   IconSpinner,
   IconLogout,
 } from "../components/Icons";
+import { Logo } from "../components/Logo";
 
 interface TechnicianPageProps {
   user: User;
@@ -171,7 +172,7 @@ export function TechnicianPage({ user, onLogout }: TechnicianPageProps) {
       <header className="app-bar">
         <div className="app-bar-left">
           <div className="app-logo">
-            AM<span>&</span>POP
+            <Logo />
           </div>
           <span className="role-badge">Technician</span>
         </div>
