@@ -19,7 +19,15 @@ DEMO_ACCOUNTS_ENABLED = os.getenv(
     "true",
 ).lower() in {"1", "true", "yes"}
 
-ALLOWED_ORIGINS = [
+# Always include known production frontend origins so the app works
+# regardless of what ALLOWED_ORIGINS env var is set to on the host.
+_PRODUCTION_ORIGINS = [
+    "https://praxis-frontend-r4tp.onrender.com",
+    "https://praxis-frontend.onrender.com",
+    "https://am-pop-frontend.onrender.com",
+]
+
+_env_origins = [
     o.strip()
     for o in os.getenv(
         "ALLOWED_ORIGINS",
@@ -27,6 +35,9 @@ ALLOWED_ORIGINS = [
     ).split(",")
     if o.strip()
 ]
+
+# Merge env origins + production origins (deduplicated, order preserved)
+ALLOWED_ORIGINS = list(dict.fromkeys(_env_origins + _PRODUCTION_ORIGINS))
 
 if "*" in ALLOWED_ORIGINS:
     raise RuntimeError("Wildcard CORS origin not allowed with credentials")
