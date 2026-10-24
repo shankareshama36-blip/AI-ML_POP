@@ -9,7 +9,7 @@ services:
       - key: PYTHON_VERSION
         value: 3.12.7
       - key: ALLOWED_ORIGINS
-        value: "https://praxis-frontend.onrender.com"
+        value: "https://praxis-frontend-r4tp.onrender.com,https://praxis-frontend.onrender.com,https://am-pop-frontend.onrender.com"
       - key: JWT_SECRET
         generateValue: true
       - key: ENVIRONMENT
