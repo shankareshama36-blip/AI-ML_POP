@@ -130,6 +130,16 @@ export interface DecisionResponse {
     approver_id: string | null;
     timestamp: string;
   };
+  context?: {
+    machine_id?: string;
+    maintenance_type?: string;
+    priority?: string;
+    condition?: string;
+    action?: string;
+    maintenance_request?: Partial<MaintenanceRequestInput>;
+    machine_state?: Partial<MachineStateInput>;
+    operational_constraints?: Partial<OperationalConstraintsInput>;
+  };
 }
 
 export interface AuthResult {
@@ -147,21 +157,71 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = localStorage.getItem("am-pop-token");
+  const token = localStorage.getItem("praxis-token") ?? sessionStorage.getItem("praxis-token");
   const headers = new Headers(options.headers);
   headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
   const res = await fetch(`${BASE}${path}`, { ...options, headers });
-  if (!res.ok) throw new ApiError(res.status, await res.text());
+  if (!res.ok) {
+    const body = await res.text();
+    try {
+      const parsed = JSON.parse(body) as { detail?: string };
+      throw new ApiError(res.status, parsed.detail || body);
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      throw new ApiError(res.status, body);
+    }
+  }
   return res.json() as Promise<T>;
 }
 
-export async function signup(email: string, password: string, role: string): Promise<AuthResult> {
+export async function signup(
+  email: string,
+  password: string,
+  role: "technician" | "maintenance_supervisor" | "production_supervisor" | "plant_manager" = "technician",
+): Promise<AuthResult> {
   return request<AuthResult>("/auth/signup", { method: "POST", body: JSON.stringify({ email, password, role }) });
 }
 
-export async function login(email: string, password: string): Promise<AuthResult> {
-  return request<AuthResult>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+const DEMO_ACCOUNT_IDENTIFIERS = new Set([
+  "tech@praxis.local",
+  "maint@praxis.local",
+  "prod@praxis.local",
+  "plant@praxis.local",
+  "tech@ampop.local",
+  "maint@ampop.local",
+  "prod@ampop.local",
+  "plant@ampop.local",
+  "tech-1",
+  "maint-sup",
+  "prod-sup",
+  "plant-mgr",
+  "tech",
+  "maint",
+  "prod",
+  "plant",
+]);
+
+export async function login(email: string, password: string, isDemo = false): Promise<AuthResult> {
+  const isDemoRequest = isDemo || DEMO_ACCOUNT_IDENTIFIERS.has(email.trim().toLowerCase());
+  const headers: Record<string, string> = {};
+  if (isDemoRequest) {
+    headers["X-Demo-Login"] = "true";
+  }
+  const query = isDemoRequest ? "?demo=true" : "";
+  return request<AuthResult>(`/auth/login${query}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ email: email.trim(), password }),
+  });
+}
+
+export async function requestPasswordReset(email: string): Promise<{ message: string; reset_token?: string }> {
+  return request("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email: email.trim() }) });
+}
+
+export async function resetPassword(token: string, password: string): Promise<void> {
+  await request<void>("/auth/reset-password", { method: "POST", body: JSON.stringify({ token: token.trim(), password }) });
 }
 
 export async function verifyToken(): Promise<User> {
@@ -169,12 +229,18 @@ export async function verifyToken(): Promise<User> {
 }
 
 export function logout(): void {
+  localStorage.removeItem("praxis-token");
+  localStorage.removeItem("praxis-user");
+  sessionStorage.removeItem("praxis-token");
+  sessionStorage.removeItem("praxis-user");
   localStorage.removeItem("am-pop-token");
   localStorage.removeItem("am-pop-user");
+  sessionStorage.removeItem("am-pop-token");
+  sessionStorage.removeItem("am-pop-user");
 }
 
 function getAuthHeaders(): Record<string, string> {
-  const token = localStorage.getItem("am-pop-token");
+  const token = localStorage.getItem("praxis-token") ?? sessionStorage.getItem("praxis-token");
   return token
     ? { "Content-Type": "application/json", Authorization: `Bearer ${token}` }
     : { "Content-Type": "application/json" };

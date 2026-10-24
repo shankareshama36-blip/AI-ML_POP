@@ -1,4 +1,4 @@
-"""Shared, typed contracts for the AM&POP maintenance decision workflow."""
+"""Shared, typed contracts for the Praxis maintenance decision workflow."""
 
 from __future__ import annotations
 

@@ -3,40 +3,46 @@ import { logout, verifyToken, type User } from "./api";
 import { LandingPage } from "./pages/LandingPage";
 import { LoginPage } from "./pages/LoginPage";
 import { SignupPage } from "./pages/SignupPage";
+import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { TechnicianPage } from "./pages/TechnicianPage";
 import { ApproverPage } from "./pages/ApproverPage";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import "./App.css";
 
-type View = "landing" | "login" | "signup" | "app";
+type View = "landing" | "login" | "signup" | "forgot" | "app";
 
 function App() {
   const [view, setView] = useState<View>("landing");
   const [user, setUser] = useState<User | null>(null);
+  const [restoringSession, setRestoringSession] = useState(true);
 
   useEffect(() => {
     async function restoreSession() {
       try {
-        if (localStorage.getItem("am-pop-token")) {
+        if (localStorage.getItem("praxis-token") || sessionStorage.getItem("praxis-token")) {
           const verified = await verifyToken();
           setUser(verified);
-          localStorage.setItem("am-pop-user", JSON.stringify(verified));
+          localStorage.setItem("praxis-user", JSON.stringify(verified));
           setView("app");
         } else {
-          setView(localStorage.getItem("am-pop-welcome") ? "login" : "landing");
+          setView(localStorage.getItem("praxis-welcome") ? "login" : "landing");
         }
       } catch {
         logout();
-        setView(localStorage.getItem("am-pop-welcome") ? "login" : "landing");
+        setView(localStorage.getItem("praxis-welcome") ? "login" : "landing");
+      } finally {
+        setRestoringSession(false);
       }
     }
     void restoreSession();
   }, []);
 
-  function handleLoginSuccess(authenticatedUser: User, token: string) {
+  function handleLoginSuccess(authenticatedUser: User, token: string, persist = true) {
     setUser(authenticatedUser);
-    localStorage.setItem("am-pop-token", token);
-    localStorage.setItem("am-pop-user", JSON.stringify(authenticatedUser));
-    localStorage.setItem("am-pop-welcome", "true");
+    const storage = persist ? localStorage : sessionStorage;
+    storage.setItem("praxis-token", token);
+    storage.setItem("praxis-user", JSON.stringify(authenticatedUser));
+    localStorage.setItem("praxis-welcome", "true");
     setView("app");
   }
 
@@ -46,32 +52,54 @@ function App() {
     setView("login");
   }
 
+  if (restoringSession) return null;
+
   return (
-    <div className="animate-fade">
-      {view === "landing" && (
-        <LandingPage onSignIn={() => setView("login")} onGetStarted={() => setView("signup")} />
-      )}
+    <ErrorBoundary fallbackTitle="Application Error">
+      <div className="animate-fade">
+        {view === "landing" && (
+          <ErrorBoundary fallbackTitle="Landing Page Error">
+            <LandingPage
+              onSignIn={() => setView("login")}
+              onGetStarted={() => setView("signup")}
+            />
+          </ErrorBoundary>
+        )}
 
-      {view === "login" && (
-        <LoginPage
-          onLogin={handleLoginSuccess}
-          onBack={() => setView("landing")}
-          onSignup={() => setView("signup")}
-        />
-      )}
+        {view === "login" && (
+          <ErrorBoundary fallbackTitle="Login Error">
+            <LoginPage
+              onLogin={handleLoginSuccess}
+              onBack={() => setView("landing")}
+              onSignup={() => setView("signup")}
+              onForgotPassword={() => setView("forgot")}
+            />
+          </ErrorBoundary>
+        )}
 
-      {view === "signup" && <SignupPage onSignup={handleLoginSuccess} onSignIn={() => setView("login")} />}
+        {view === "signup" && (
+          <ErrorBoundary fallbackTitle="Sign Up Error">
+            <SignupPage onSignup={handleLoginSuccess} onSignIn={() => setView("login")} />
+          </ErrorBoundary>
+        )}
 
-      {view === "app" && user && (
-        <>
-          {user.role === "technician" ? (
-            <TechnicianPage user={user} onLogout={handleLogout} />
-          ) : (
-            <ApproverPage user={user} onLogout={handleLogout} />
-          )}
-        </>
-      )}
-    </div>
+        {view === "forgot" && (
+          <ErrorBoundary fallbackTitle="Password Reset Error">
+            <ForgotPasswordPage onSignIn={() => setView("login")} />
+          </ErrorBoundary>
+        )}
+
+        {view === "app" && user && (
+          <ErrorBoundary fallbackTitle="Dashboard Error">
+            {user.role === "technician" ? (
+              <TechnicianPage user={user} onLogout={handleLogout} />
+            ) : (
+              <ApproverPage user={user} onLogout={handleLogout} />
+            )}
+          </ErrorBoundary>
+        )}
+      </div>
+    </ErrorBoundary>
   );
 }
 

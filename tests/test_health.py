@@ -20,8 +20,15 @@ def test_health() -> None:
     assert response.status_code == 200
     assert response.json() == {
         "status": "ok",
-        "service": "am-pop-api",
+        "service": "praxis-api",
     }
+
+
+def test_landing_page_decision_counter_is_public_and_numeric() -> None:
+    response = client.get("/analytics/decisions-count")
+
+    assert response.status_code == 200
+    assert response.json()["count"] >= 0
 
 
 def test_validate_maintenance_request_endpoint_accepts_valid_request() -> None:

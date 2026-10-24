@@ -18,7 +18,9 @@ import {
   IconSpinner,
   IconLogout,
   IconClipboard,
+  IconAlert,
 } from "../components/Icons";
+import { Logo } from "../components/Logo";
 
 interface ApproverPageProps {
   user: User;
@@ -51,6 +53,28 @@ function formatRole(role: string): string {
     default:
       return role.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   }
+}
+
+function getErrorMessage(error: unknown): string {
+  const rawMessage = error instanceof ApiError || error instanceof Error
+    ? error.message
+    : String(error);
+
+  let message = rawMessage;
+  try {
+    const parsed = JSON.parse(rawMessage) as { detail?: unknown };
+    if (typeof parsed.detail === "string") {
+      message = parsed.detail;
+    } else if (parsed.detail && typeof parsed.detail === "object" && "message" in parsed.detail) {
+      message = String(parsed.detail.message);
+    }
+  } catch {
+    // Non-JSON responses are already suitable for display.
+  }
+
+  return message.toLowerCase().includes("not in the approval chain")
+    ? "You need to run the AI Evaluation first before you can approve this action."
+    : message;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -112,14 +136,18 @@ export function ApproverPage({ user, onLogout }: ApproverPageProps) {
       }
     } catch (err: unknown) {
       if (err instanceof ApiError && err.status === 401) onLogout();
-      setError(err instanceof Error ? err.message : String(err));
+      setError(getErrorMessage(err));
     } finally {
       setLoadingList(false);
     }
   }
 
   useEffect(() => {
-    fetchComplaints();
+    // Defer the request so loading state is updated after the effect commits.
+    const task = window.setTimeout(() => { void fetchComplaints(); }, 0);
+    return () => window.clearTimeout(task);
+    // fetchComplaints intentionally reads the current page props and state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const selectedComplaint = complaints.find((c) => c.complaint_id === selectedId) || null;
@@ -137,7 +165,7 @@ export function ApproverPage({ user, onLogout }: ApproverPageProps) {
       setInfoMsg("AI evaluation complete. Decision attached.");
     } catch (err: unknown) {
       if (err instanceof ApiError && err.status === 401) onLogout();
-      setError(err instanceof Error ? err.message : String(err));
+      setError(getErrorMessage(err));
     } finally {
       setActionLoading(false);
     }
@@ -158,7 +186,7 @@ export function ApproverPage({ user, onLogout }: ApproverPageProps) {
       await fetchComplaints();
     } catch (err: unknown) {
       if (err instanceof ApiError && err.status === 401) onLogout();
-      setError(err instanceof Error ? err.message : String(err));
+      setError(getErrorMessage(err));
     } finally {
       setActionLoading(false);
     }
@@ -179,7 +207,7 @@ export function ApproverPage({ user, onLogout }: ApproverPageProps) {
       await fetchComplaints();
     } catch (err: unknown) {
       if (err instanceof ApiError && err.status === 401) onLogout();
-      setError(err instanceof Error ? err.message : String(err));
+      setError(getErrorMessage(err));
     } finally {
       setActionLoading(false);
     }
@@ -202,7 +230,7 @@ export function ApproverPage({ user, onLogout }: ApproverPageProps) {
       <header className="app-bar">
         <div className="app-bar-left">
           <div className="app-logo">
-            AM<span>&</span>POP
+            <Logo />
           </div>
           <span className="role-badge">{formatRole(user.role)}</span>
         </div>
@@ -227,7 +255,8 @@ export function ApproverPage({ user, onLogout }: ApproverPageProps) {
         </div>
 
         {error && (
-          <div className="login-error" style={{ marginBottom: "16px" }}>
+          <div className="approver-alert" role="alert" style={{ marginBottom: "16px" }}>
+            <IconAlert size={17} aria-hidden="true" />
             <span>{error}</span>
           </div>
         )}
@@ -250,6 +279,7 @@ export function ApproverPage({ user, onLogout }: ApproverPageProps) {
                 onClick={fetchComplaints}
                 disabled={loadingList}
                 style={{ padding: "4px 8px" }}
+                aria-label="Refresh pending review queue"
               >
                 {loadingList ? "…" : "↻"}
               </button>
@@ -263,21 +293,32 @@ export function ApproverPage({ user, onLogout }: ApproverPageProps) {
                 <p>All clear. No complaints waiting for your approval.</p>
               </div>
             ) : (
-              <div className="complaint-list">
+              <div className="complaint-list" role="listbox" aria-label="Complaints pending review">
                 {complaints.map((item) => {
                   const isSelected = item.complaint_id === selectedId;
                   return (
                     <div
                       key={item.complaint_id}
-                      className={`complaint-item ${isSelected ? "selected" : ""}`}
+                      className={`complaint-item ${isSelected ? "active" : ""}`}
                       data-status={item.status}
+                      role="option"
+                      aria-selected={isSelected}
+                      tabIndex={0}
                       onClick={() => {
                         setSelectedId(item.complaint_id);
                         setError(null);
                         setInfoMsg(null);
                       }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setSelectedId(item.complaint_id);
+                          setError(null);
+                          setInfoMsg(null);
+                        }
+                      }}
                     >
-                      <div>
+                      <div className="complaint-content">
                         <div className="complaint-id">#{item.complaint_id.slice(0, 8)}</div>
                         <div className="complaint-title">
                           {item.machine_id} — {item.problem_type}
@@ -359,7 +400,7 @@ export function ApproverPage({ user, onLogout }: ApproverPageProps) {
                 {/* Decision Section */}
                 <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1px solid var(--border-subtle)" }}>
                   <div className="card-title" style={{ marginBottom: "16px" }}>
-                    <IconTrending size={18} /> AM&amp;POP Decision Intelligence
+                    <IconTrending size={18} /> Praxis Decision Intelligence
                   </div>
 
                   {!selectedComplaint.decision ? (
@@ -384,7 +425,7 @@ export function ApproverPage({ user, onLogout }: ApproverPageProps) {
                         </button>
                       ) : (
                         <p className="text-muted" style={{ fontStyle: "italic", fontSize: "13px" }}>
-                          Waiting for Maintenance Supervisor to trigger AI evaluation.
+                          Waiting for Maintenance Supervisor to evaluate.
                         </p>
                       )}
                     </div>
@@ -538,7 +579,7 @@ export function ApproverPage({ user, onLogout }: ApproverPageProps) {
                 </div>
 
                 {/* Decision Actions / Authorizations */}
-                <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1px solid var(--border-subtle)" }}>
+                {selectedComplaint.decision && <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1px solid var(--border-subtle)" }}>
                   <div className="card-title" style={{ marginBottom: "12px" }}>
                     Supervisor Authorization
                   </div>
@@ -616,7 +657,7 @@ export function ApproverPage({ user, onLogout }: ApproverPageProps) {
                       )}
                     </div>
                   )}
-                </div>
+                </div>}
               </div>
             ) : (
               <div className="empty-state">

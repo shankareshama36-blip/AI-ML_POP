@@ -1,4 +1,4 @@
-"""Real scikit-learn prediction engine for AM&POP.
+"""Real scikit-learn prediction engine for Praxis.
 
 Loads three trained models (downtime, cost, risk) and exposes a single
 predict() method that returns (downtime_hours, cost, risk_score, confidence).

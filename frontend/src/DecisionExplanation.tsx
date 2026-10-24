@@ -20,7 +20,7 @@ export const DecisionExplanation: React.FC<DecisionExplanationProps> = ({
   } = decision;
 
   // Optional context if sent by backend
-  const context = (decision as unknown as { context?: any }).context;
+  const context = decision.context;
 
   const winnerActionId = rec.recommended_action_id;
   const winnerCandidate = candidate_actions.find(
@@ -83,7 +83,7 @@ export const DecisionExplanation: React.FC<DecisionExplanationProps> = ({
       <section className="explanation-section">
         <h3>1. Summary</h3>
         <p>
-          AM&amp;POP recommends action <strong>{winnerName}</strong>. It is feasible
+          Praxis recommends action <strong>{winnerName}</strong>. It is feasible
           within all constraints and has the lowest combined score of{" "}
           <strong>
             {winnerScore !== undefined ? `₹${winnerScore.toLocaleString()}` : "—"}

@@ -114,7 +114,11 @@ export function TechnicianPage({ user, onLogout }: TechnicianPageProps) {
   }
 
   useEffect(() => {
-    fetchComplaints();
+    // Defer the request so loading state is updated after the effect commits.
+    const task = window.setTimeout(() => { void fetchComplaints(); }, 0);
+    return () => window.clearTimeout(task);
+    // fetchComplaints intentionally reads the current page props and state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   async function handleSubmit(e: FormEvent) {
@@ -317,6 +321,7 @@ export function TechnicianPage({ user, onLogout }: TechnicianPageProps) {
               className="btn-ghost"
               onClick={fetchComplaints}
               disabled={loadingList}
+              aria-label="Refresh complaints list"
             >
               {loadingList ? "Refreshing…" : "↻ Refresh"}
             </button>

@@ -1,4 +1,4 @@
-"""Train real scikit-learn models for AM&POP prediction engine.
+"""Train real scikit-learn models for Praxis prediction engine.
 
 Trains three models on data/raw/maintenance_requests.csv:
 - downtime_model: predicts downtime_hours (regression)

@@ -1,4 +1,4 @@
-"""Demo-only authentication for AM&POP (no hashing — academic project)."""
+"""Demo-only authentication for Praxis (no hashing — academic project)."""
 
 from __future__ import annotations
 

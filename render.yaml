@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: am-pop-backend
+    name: praxis-backend
     runtime: python
     plan: free
     buildCommand: "pip install -e '.[dev]'"
@@ -9,12 +9,18 @@ services:
       - key: PYTHON_VERSION
         value: 3.12.7
       - key: ALLOWED_ORIGINS
-        value: "https://am-pop-frontend.onrender.com"
+        value: "https://praxis-frontend.onrender.com"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+      - key: ENABLE_DEMO_ACCOUNTS
+        value: "true"
 
   - type: web
-    name: am-pop-frontend
+    name: praxis-frontend
     runtime: static
-    buildCommand: "cd frontend && npm install && npm run build"
+    buildCommand: "cd frontend && npm ci && npm run build"
     staticPublishPath: "frontend/dist"
     routes:
       - type: rewrite

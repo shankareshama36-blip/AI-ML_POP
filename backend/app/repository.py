@@ -6,6 +6,7 @@ so PostgreSQL can replace it without changing HTTP or decision-engine code.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from threading import RLock
 from uuid import UUID
 
@@ -99,6 +100,23 @@ class DecisionRepository:
             return [
                 experience.model_copy(deep=True) for experience in self._experiences
             ]
+
+    def total_decisions_count(self) -> int:
+        """Count total decisions created."""
+        with self._lock:
+            return len(self._decisions)
+
+    def decisions_count_this_week(self) -> int:
+        """Count decisions created since the start of the current UTC week."""
+        now = datetime.now(UTC)
+        week_start = (now - timedelta(days=now.weekday())).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        with self._lock:
+            return sum(
+                workflow.timestamp >= week_start
+                for workflow in self._decisions.values()
+            )
 
     def _get_internal(self, decision_id: UUID) -> DecisionWorkflowResponse:
         try:

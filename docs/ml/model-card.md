@@ -1,8 +1,8 @@
-# AM&POP — ML Model Card
+# Praxis — ML Model Card
 
 ## Model Overview
 
-AM&POP V1 ships three scikit-learn models that power the Factory Maintenance
+Praxis V1 ships three scikit-learn models that power the Factory Maintenance
 Decision Engine. Each model is trained once offline on a synthetic dataset and
 loaded at API startup via `joblib`. They are used **inside** the decision loop —
 ML predictions are one input to the Dijkstra-based optimizer; they do not make
@@ -68,7 +68,7 @@ training–inference consistency.
 - **Synthetic data only.** Models have never seen real sensor readings.
   Metrics will degrade on live factory data until retrained.
 - **Factory domain only.** The feature schema is specific to maintenance
-  work-orders; it is not transferable to other AM&POP domains without
+  work-orders; it is not transferable to other Praxis domains without
   retraining.
 - **Bounded input ranges.** Predictions outside the training ranges
   (e.g., `temperature_c` > 120 °C) are extrapolations with unknown reliability.

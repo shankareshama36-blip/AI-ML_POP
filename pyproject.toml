@@ -1,13 +1,14 @@
 [project]
-name = "am-pop"
+name = "praxis"
 version = "0.1.0"
-description = "AM&POP — Decision Intelligence Layer for Autonomous Operations"
+description = "Praxis — Decision Intelligence Layer for Autonomous Operations"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi",
     "uvicorn[standard]",
     "pydantic",
+    "email-validator",
     "scikit-learn",
     "pandas",
     "numpy",

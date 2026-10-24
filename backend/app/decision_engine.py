@@ -1,4 +1,4 @@
-"""Decision-loop stages for the V1 AM&POP engine.
+"""Decision-loop stages for the V1 Praxis engine.
 
 Stage 1: Formal validation (in formal_engine)
 Stage 2: Context building

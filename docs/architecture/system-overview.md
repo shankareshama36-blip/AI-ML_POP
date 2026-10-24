@@ -1,4 +1,4 @@
-# AM&POP System Architecture Overview
+# Praxis System Architecture Overview
 
 ## 1. Problem
 Organizations face changing situations with limited resources, deadlines, and competing objectives. Existing systems can store data and make predictions, but they struggle to answer: "Given the current situation, what is the best action to take right now?"

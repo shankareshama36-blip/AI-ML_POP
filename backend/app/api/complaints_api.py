@@ -1,12 +1,12 @@
-"""JWT-protected complaint workflow endpoints for AM&POP."""
+"""JWT-protected complaint workflow endpoints for Praxis."""
 
 from __future__ import annotations
 
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel, ConfigDict, Field
 
 from backend.app.auth_real import get_current_user
 from backend.app.complaints import (
@@ -20,6 +20,7 @@ from backend.app.complaints import (
     list_complaints_for_role,
     reject_complaint,
 )
+from backend.app.core.rate_limit import limiter
 from backend.app.decision_engine import NoFeasibleActionError, evaluate_decision
 from backend.app.formal_engine import MaintenanceRequest
 from backend.app.models import MachineState, MachineStatus, OperationalConstraints
@@ -44,11 +45,13 @@ def _get_or_404(complaint_id: UUID) -> ComplaintRecord:
 
 
 class ActionBody(BaseModel):
-    comment: str = ""
+    model_config = ConfigDict(extra="forbid")
+    comment: str = Field(default="", max_length=2_000)
 
 
 @router.post("", response_model=ComplaintRecord, status_code=status.HTTP_201_CREATED)
-def submit_complaint(payload: ComplaintCreate, current_user: CurrentUser) -> ComplaintRecord:
+@limiter.limit("20/minute")
+def submit_complaint(request: Request, payload: ComplaintCreate, current_user: CurrentUser) -> ComplaintRecord:
     _require_role(current_user, {"technician"})
     return create_complaint(payload, submitted_by=str(current_user["email"]))
 
@@ -72,7 +75,8 @@ def get_one_complaint(complaint_id: UUID, current_user: CurrentUser) -> Complain
 
 
 @router.post("/{complaint_id}/evaluate", response_model=ComplaintRecord)
-def evaluate_complaint(complaint_id: UUID, current_user: CurrentUser) -> ComplaintRecord:
+@limiter.limit("20/minute")
+def evaluate_complaint(request: Request, complaint_id: UUID, current_user: CurrentUser) -> ComplaintRecord:
     _require_role(current_user, {"maintenance_supervisor"})
     record = _get_or_404(complaint_id)
     maintenance_request = MaintenanceRequest(machine_id=record.machine_id, maintenance_type="CORRECTIVE", priority="HIGH" if record.severity in ("HIGH", "CRITICAL") else "MEDIUM", condition=record.severity if record.severity in ("NORMAL", "WARN", "ALERT", "CRITICAL") else "WARN", action="REPAIR")
@@ -86,7 +90,8 @@ def evaluate_complaint(complaint_id: UUID, current_user: CurrentUser) -> Complai
 
 
 @router.post("/{complaint_id}/approve", response_model=ComplaintRecord)
-def approve(complaint_id: UUID, current_user: CurrentUser, body: ActionBody | None = None) -> ComplaintRecord:
+@limiter.limit("30/minute")
+def approve(request: Request, complaint_id: UUID, current_user: CurrentUser, body: ActionBody | None = None) -> ComplaintRecord:
     role = _require_role(current_user, _APPROVER_ROLES)
     _get_or_404(complaint_id)
     try:
@@ -96,7 +101,8 @@ def approve(complaint_id: UUID, current_user: CurrentUser, body: ActionBody | No
 
 
 @router.post("/{complaint_id}/reject", response_model=ComplaintRecord)
-def reject(complaint_id: UUID, current_user: CurrentUser, body: ActionBody | None = None) -> ComplaintRecord:
+@limiter.limit("30/minute")
+def reject(request: Request, complaint_id: UUID, current_user: CurrentUser, body: ActionBody | None = None) -> ComplaintRecord:
     role = _require_role(current_user, _APPROVER_ROLES)
     _get_or_404(complaint_id)
     try:

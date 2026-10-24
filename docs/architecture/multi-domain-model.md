@@ -1,9 +1,9 @@
-# AM&POP Generic Multi-Domain Data Model Architecture
+# Praxis Generic Multi-Domain Data Model Architecture
 
 ## 1. Purpose
-AM&POP is designed as an autonomous, grounded decision-making architecture, not a single-purpose factory maintenance utility. While factory maintenance serves as the inaugural reference implementation ("Domain Pack 1"), real-world decision-making across domains shares an identical invariant structure: intake an operational situation, validate state boundaries, evaluate prospective actions, estimate consequence trade-offs, enforce non-negotiable constraints, optimize objective criteria, require auditable authorization, and record grounded post-decision outcomes to build experiential memory.
+Praxis is designed as an autonomous, grounded decision-making architecture, not a single-purpose factory maintenance utility. While factory maintenance serves as the inaugural reference implementation ("Domain Pack 1"), real-world decision-making across domains shares an identical invariant structure: intake an operational situation, validate state boundaries, evaluate prospective actions, estimate consequence trade-offs, enforce non-negotiable constraints, optimize objective criteria, require auditable authorization, and record grounded post-decision outcomes to build experiential memory.
 
-By establishing a declarative, domain-agnostic metadata layer, AM&POP allows organizations to define arbitrary domains (healthcare, retail, personal finance, education, logistics, SaaS billing) through schema and configuration rather than bespoke code changes.
+By establishing a declarative, domain-agnostic metadata layer, Praxis allows organizations to define arbitrary domains (healthcare, retail, personal finance, education, logistics, SaaS billing) through schema and configuration rather than bespoke code changes.
 
 ---
 

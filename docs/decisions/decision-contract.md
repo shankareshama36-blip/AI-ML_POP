@@ -1,6 +1,6 @@
-# AM&POP Decision Contract
+# Praxis Decision Contract
 
-This document defines the common language for the AM&POP system. All modules (backend, ML, optimization, frontend) must use these exact structures. The typed Pydantic models in `backend/app/models.py` implement this contract.
+This document defines the common language for the Praxis system. All modules (backend, ML, optimization, frontend) must use these exact structures. The typed Pydantic models in `backend/app/models.py` implement this contract.
 
 ## 1. DecisionRequest
 **Purpose:** The initial input from the user or system.
@@ -41,7 +41,7 @@ This document defines the common language for the AM&POP system. All modules (ba
 - `best_action_id`: The winning action_id
 
 ## 7. DecisionResult
-**Purpose:** The final structured output recommended by AM&POP.
+**Purpose:** The final structured output recommended by Praxis.
 - `decision_id`: Unique identifier
 - `recommended_action_id`: The best action
 - `expected_cost`: Float

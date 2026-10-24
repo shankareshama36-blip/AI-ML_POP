@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import os
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
+
+from backend.app.config import ALLOWED_ORIGINS
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -22,7 +22,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Permissions-Policy"] = (
             "geolocation=(), microphone=(), camera=()"
         )
-        if request.url.scheme == "https":
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; "
+            "form-action 'self'"
+        )
+        if request.url.scheme == "https" or request.headers.get("x-forwarded-proto", "").lower() == "https":
             response.headers["Strict-Transport-Security"] = (
                 "max-age=31536000; includeSubDomains"
             )
@@ -31,23 +35,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 def add_security_middleware(app: FastAPI) -> None:
     """Attach CORS and security header middleware to the FastAPI app."""
-    default_origins = [
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ]
-    env_origins = os.getenv("ALLOWED_ORIGINS", "")
-    allowed_origins = list(
-        dict.fromkeys(
-            default_origins
-            + [origin.strip() for origin in env_origins.split(",") if origin.strip()]
-        )
-    )
-
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=allowed_origins,
+        allow_origins=ALLOWED_ORIGINS,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE"],
+        allow_headers=["Authorization", "Content-Type"],
     )
     app.add_middleware(SecurityHeadersMiddleware)

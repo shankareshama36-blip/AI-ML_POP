@@ -1,15 +1,15 @@
-# AM&POP — Autonomous Maintenance & Planning Optimization Platform
+# Praxis — Autonomous Maintenance & Planning Optimization Platform
 
-> **AI can act. AM&POP decides.**
+> **AI can act. Praxis decides.**
 
 ---
 
-## What Is AM&POP?
+## What Is Praxis?
 
-AM&POP is a **decision intelligence system** — a platform that combines formal
+Praxis is a **decision intelligence system** — a platform that combines formal
 verification, machine learning, constraint satisfaction, and graph optimization
 to produce **explainable, auditable decisions**, not just predictions. Where a
-typical AI model answers "what will happen?", AM&POP answers "what should we
+typical AI model answers "what will happen?", Praxis answers "what should we
 do, and why, and who must approve it?"
 
 ---
@@ -19,7 +19,7 @@ do, and why, and who must approve it?"
 Prediction alone is insufficient. A model that forecasts 4 hours of downtime
 provides no guidance on which of the four available maintenance actions to
 choose, whether operational constraints allow it, what it will cost, or whether
-a human must approve the action before execution. AM&POP closes that gap.
+a human must approve the action before execution. Praxis closes that gap.
 
 ---
 
@@ -202,4 +202,4 @@ ruff check .
 
 ---
 
-> **AI can act. AM&POP decides.**
+> **AI can act. Praxis decides.**

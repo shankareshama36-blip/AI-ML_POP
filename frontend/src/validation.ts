@@ -45,6 +45,10 @@ export const ALLOWED_STATUSES = [
   "OFFLINE",
 ] as const;
 
+function includesValue(values: readonly string[], value: string): boolean {
+  return values.includes(value);
+}
+
 export function validateDecisionInput(input: DecisionInput): {
   valid: boolean;
   errors: Record<string, string>;
@@ -52,23 +56,21 @@ export function validateDecisionInput(input: DecisionInput): {
   const errors: Record<string, string> = {};
 
   // Maintenance Request
-  if (!ALLOWED_MACHINE_IDS.includes(input.maintenance_request.machine_id as any)) {
+  if (!includesValue(ALLOWED_MACHINE_IDS, input.maintenance_request.machine_id)) {
     errors["machine_id"] = `Machine ID must be one of: ${ALLOWED_MACHINE_IDS.join(", ")}`;
   }
   if (
-    !ALLOWED_MAINTENANCE_TYPES.includes(
-      input.maintenance_request.maintenance_type as any
-    )
+    !includesValue(ALLOWED_MAINTENANCE_TYPES, input.maintenance_request.maintenance_type)
   ) {
     errors["maintenance_type"] = `Maintenance type must be one of: ${ALLOWED_MAINTENANCE_TYPES.join(", ")}`;
   }
-  if (!ALLOWED_PRIORITIES.includes(input.maintenance_request.priority as any)) {
+  if (!includesValue(ALLOWED_PRIORITIES, input.maintenance_request.priority)) {
     errors["priority"] = `Priority must be one of: ${ALLOWED_PRIORITIES.join(", ")}`;
   }
-  if (!ALLOWED_CONDITIONS.includes(input.maintenance_request.condition as any)) {
+  if (!includesValue(ALLOWED_CONDITIONS, input.maintenance_request.condition)) {
     errors["condition"] = `Condition must be one of: ${ALLOWED_CONDITIONS.join(", ")}`;
   }
-  if (!ALLOWED_ACTIONS.includes(input.maintenance_request.action as any)) {
+  if (!includesValue(ALLOWED_ACTIONS, input.maintenance_request.action)) {
     errors["action"] = `Action must be one of: ${ALLOWED_ACTIONS.join(", ")}`;
   }
 
@@ -93,7 +95,7 @@ export function validateDecisionInput(input: DecisionInput): {
     errors["operating_hours"] = "Operating hours must be an integer greater than or equal to 0";
   }
 
-  if (!ALLOWED_STATUSES.includes(input.machine_state.status as any)) {
+  if (!includesValue(ALLOWED_STATUSES, input.machine_state.status)) {
     errors["status"] = `Status must be one of: ${ALLOWED_STATUSES.join(", ")}`;
   }
 

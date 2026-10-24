@@ -7,7 +7,7 @@ __pycache__/
 node_modules/
 dist/
 build/
-am_pop.egg-info/
+praxis.egg-info/
 .DS_Store
 *.pyc
 data/raw/*.csv

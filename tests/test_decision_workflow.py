@@ -1,5 +1,11 @@
+import os
+
 from fastapi.testclient import TestClient
 
+os.environ.setdefault("JWT_SECRET", "test-secret-not-for-production")
+
+from backend.app.auth_real import create_jwt, hash_password
+from backend.app.db import SessionLocal, User, init_db
 from backend.app.decision_engine import (
     build_context,
     evaluate_constraints,
@@ -11,7 +17,21 @@ from backend.app.formal_engine import MaintenanceRequest
 from backend.app.main import app
 from backend.app.models import MachineState, OperationalConstraints
 
-client = TestClient(app)
+init_db()
+with SessionLocal() as session:
+    user = session.query(User).filter_by(email="decision-test@praxis.local").first()
+    if user is None:
+        user = User(
+            email="decision-test@praxis.local",
+            password_hash=hash_password("StrongTestPassword1"),
+            role="maintenance_supervisor",
+        )
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+    token = create_jwt(user.id, user.role)
+
+client = TestClient(app, headers={"Authorization": f"Bearer {token}"})
 
 FORMAL_REQUEST = {
     "machine_id": "M-101",

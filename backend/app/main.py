@@ -1,17 +1,21 @@
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
 
 from backend.app.api.auth_api import router as auth_router
 from backend.app.api.complaints_api import router as complaints_router
+from backend.app.auth_real import get_current_user
 from backend.app.core.rate_limit import (
     limiter,
     rate_limit_exceeded_handler,
 )
-from backend.app.core.security import add_security_middleware
-from backend.app.db import init_db
+from backend.app.core.security import SecurityHeadersMiddleware
+from backend.app.db import ComplaintWorkflow, SessionLocal, init_db
 from backend.app.decision_engine import NoFeasibleActionError, evaluate_decision
 from backend.app.formal_engine import (
     DfaValidationResult,
@@ -33,25 +37,62 @@ from backend.app.repository import (
     DecisionRepository,
 )
 
-app = FastAPI(title="AM&POP API")
+from .config import ALLOWED_ORIGINS
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(title="Praxis API", lifespan=lifespan)
+CurrentUser = Annotated[dict[str, object], Depends(get_current_user)]
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
-add_security_middleware(app)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
+)
+app.add_middleware(SecurityHeadersMiddleware)
+
+
+@app.middleware("http")
+async def cache_request_body_middleware(request: Request, call_next):
+    body = await request.body()
+    request.state.raw_body = body
+
+    async def receive():
+        return {"type": "http.request", "body": body}
+
+    request._receive = receive
+    return await call_next(request)
 
 app.include_router(auth_router)
 app.include_router(complaints_router)
-
-
-@app.on_event("startup")
-def initialise_database() -> None:
-    init_db()
 
 decision_repository = DecisionRepository()
 
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "service": "am-pop-api"}
+    return {"status": "ok", "service": "praxis-api"}
+
+
+@app.get("/analytics/decisions-count")
+@limiter.limit("60/minute")
+def decisions_count(request: Request) -> dict[str, int]:
+    """Public aggregate counting total decisions in DB and repository."""
+    with SessionLocal() as session:
+        db_count = (
+            session.query(ComplaintWorkflow)
+            .filter(ComplaintWorkflow.decision.isnot(None))
+            .count()
+        )
+    return {"count": db_count + decision_repository.total_decisions_count()}
 
 
 @app.post(
@@ -77,6 +118,7 @@ def validate_maintenance_request_endpoint(
 def evaluate_maintenance_decision(
     request: Request,
     payload: DecisionEvaluationRequest,
+    current_user: CurrentUser,
 ) -> DecisionWorkflowResponse:
     """Run the complete V1 decision loop and create a pending audit record."""
 
@@ -125,7 +167,7 @@ def evaluate_maintenance_decision(
 @app.get("/decisions/{decision_id}", response_model=DecisionWorkflowResponse)
 @limiter.limit("60/minute")
 def get_decision(
-    request: Request, decision_id: UUID
+    request: Request, decision_id: UUID, current_user: CurrentUser
 ) -> DecisionWorkflowResponse:
     """Retrieve a decision and its immutable stage-by-stage audit trail."""
 
@@ -140,7 +182,7 @@ def get_decision(
 @app.post("/decisions/{decision_id}/approval", response_model=DecisionWorkflowResponse)
 @limiter.limit("60/minute")
 def update_decision_approval(
-    request: Request, decision_id: UUID, payload: ApprovalUpdate
+    request: Request, decision_id: UUID, payload: ApprovalUpdate, current_user: CurrentUser
 ) -> DecisionWorkflowResponse:
     """Record the manager's human-in-the-loop decision."""
 
@@ -159,7 +201,7 @@ def update_decision_approval(
 @app.post("/decisions/{decision_id}/outcome", response_model=DecisionWorkflowResponse)
 @limiter.limit("60/minute")
 def record_decision_outcome(
-    request: Request, decision_id: UUID, payload: OutcomeCreate
+    request: Request, decision_id: UUID, payload: OutcomeCreate, current_user: CurrentUser
 ) -> DecisionWorkflowResponse:
     """Record execution results and add an experience-memory entry."""
 
@@ -176,7 +218,8 @@ def record_decision_outcome(
 
 
 @app.get("/experiences", response_model=list[Experience])
-def list_experiences() -> list[Experience]:
+@limiter.limit("60/minute")
+def list_experiences(request: Request, current_user: CurrentUser) -> list[Experience]:
     """Return completed decisions available to future learning stages."""
 
     return decision_repository.list_experiences()
