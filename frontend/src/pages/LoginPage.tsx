@@ -33,12 +33,15 @@ export function LoginPage({ onLogin, onBack, onSignup, onForgotPassword }: Login
       const result = await login(email.trim(), password);
       onLogin(result.user, result.token, remember);
     } catch (err) {
+      console.error("Login failed:", err);
       setError(
         err instanceof ApiError && err.status === 401
           ? "Invalid email or password"
           : err instanceof ApiError && err.status === 429
           ? "Too many sign-in attempts. Please wait before trying again."
           : err instanceof ApiError
+          ? err.message
+          : err instanceof Error
           ? err.message
           : "Login failed. Please verify the backend API is running."
       );
@@ -56,12 +59,15 @@ export function LoginPage({ onLogin, onBack, onSignup, onForgotPassword }: Login
       const result = await login(demoEmail, demoPass, true);
       onLogin(result.user, result.token, true);
     } catch (err) {
+      console.error("Demo login failed:", err);
       setError(
         err instanceof ApiError && err.status === 429
           ? "Too many sign-in attempts. Please wait before trying again."
           : err instanceof ApiError && err.status === 401
           ? "Invalid demo credentials. Please check backend configuration."
           : err instanceof ApiError
+          ? err.message
+          : err instanceof Error
           ? err.message
           : "Demo sign-in failed. Please verify the backend API is running."
       );

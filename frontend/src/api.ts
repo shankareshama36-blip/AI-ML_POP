@@ -204,14 +204,9 @@ const DEMO_ACCOUNT_IDENTIFIERS = new Set([
 
 export async function login(email: string, password: string, isDemo = false): Promise<AuthResult> {
   const isDemoRequest = isDemo || DEMO_ACCOUNT_IDENTIFIERS.has(email.trim().toLowerCase());
-  const headers: Record<string, string> = {};
-  if (isDemoRequest) {
-    headers["X-Demo-Login"] = "true";
-  }
   const query = isDemoRequest ? "?demo=true" : "";
   return request<AuthResult>(`/auth/login${query}`, {
     method: "POST",
-    headers,
     body: JSON.stringify({ email: email.trim(), password }),
   });
 }
