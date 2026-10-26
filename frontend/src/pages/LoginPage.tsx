@@ -1,7 +1,8 @@
 import { useState, useEffect, type FormEvent } from "react";
-import { ApiError, login, pingHealth, type User } from "../api";
-import { IconAlert, IconSpinner } from "../components/Icons";
+import { login, pingHealth, type User } from "../api";
+import { IconSpinner } from "../components/Icons";
 import { Logo } from "../components/Logo";
+import { useToast, formatUserFriendlyError } from "../components/Toast";
 
 interface LoginPageProps {
   onLogin: (user: User, token: string, persist?: boolean) => void;
@@ -18,12 +19,12 @@ const DEMO_ACCOUNTS = [
 ];
 
 export function LoginPage({ onLogin, onBack, onSignup, onForgotPassword }: LoginPageProps) {
+  const { showToast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
   const [isWakingUp, setIsWakingUp] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [showDemo, setShowDemo] = useState(true);
 
   useEffect(() => {
@@ -35,25 +36,16 @@ export function LoginPage({ onLogin, onBack, onSignup, onForgotPassword }: Login
     event.preventDefault();
     setLoading(true);
     setIsWakingUp(false);
-    setError(null);
     const wakeTimer = setTimeout(() => setIsWakingUp(true), 3500);
 
     try {
       const result = await login(email.trim(), password);
+      showToast(`Welcome back, ${result.user.email}!`, "success");
       onLogin(result.user, result.token, remember);
     } catch (err) {
       console.error("Login failed:", err);
-      setError(
-        err instanceof ApiError && err.status === 401
-          ? "Invalid email or password"
-          : err instanceof ApiError && err.status === 429
-          ? "Too many sign-in attempts. Please wait before trying again."
-          : err instanceof ApiError
-          ? err.message
-          : err instanceof Error
-          ? err.message
-          : "Login failed. Please verify the backend API is running."
-      );
+      const friendlyMsg = formatUserFriendlyError(err);
+      showToast(friendlyMsg, "error");
     } finally {
       clearTimeout(wakeTimer);
       setIsWakingUp(false);
@@ -64,27 +56,18 @@ export function LoginPage({ onLogin, onBack, onSignup, onForgotPassword }: Login
   async function handleDemoLogin(demoEmail: string, demoPass: string) {
     setEmail(demoEmail);
     setPassword(demoPass);
-    setError(null);
     setLoading(true);
     setIsWakingUp(false);
     const wakeTimer = setTimeout(() => setIsWakingUp(true), 3500);
 
     try {
       const result = await login(demoEmail, demoPass, true);
+      showToast(`Signed in as ${result.user.role.replace(/_/g, " ")}`, "success");
       onLogin(result.user, result.token, true);
     } catch (err) {
       console.error("Demo login failed:", err);
-      setError(
-        err instanceof ApiError && err.status === 429
-          ? "Too many sign-in attempts. Please wait before trying again."
-          : err instanceof ApiError && err.status === 401
-          ? "Invalid demo credentials. Please check backend configuration."
-          : err instanceof ApiError
-          ? err.message
-          : err instanceof Error
-          ? err.message
-          : "Demo sign-in failed. Please verify the backend API is running."
-      );
+      const friendlyMsg = formatUserFriendlyError(err);
+      showToast(friendlyMsg, "error");
     } finally {
       clearTimeout(wakeTimer);
       setIsWakingUp(false);
@@ -108,12 +91,6 @@ export function LoginPage({ onLogin, onBack, onSignup, onForgotPassword }: Login
         <div className="login-logo"><Logo /></div>
         <p className="login-tagline">AI can act. Praxis decides.</p>
         <form onSubmit={handleSubmit} className="login-form">
-          {error && (
-            <div className="login-error" role="alert">
-              <IconAlert size={16} />
-              <span>{error}</span>
-            </div>
-          )}
           <div className="login-field">
             <label htmlFor="login-email">Email</label>
             <input

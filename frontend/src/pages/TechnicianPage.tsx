@@ -17,6 +17,7 @@ import {
   IconLogout,
 } from "../components/Icons";
 import { Logo } from "../components/Logo";
+import { useToast, formatUserFriendlyError } from "../components/Toast";
 
 interface TechnicianPageProps {
   user: User;
@@ -85,11 +86,10 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export function TechnicianPage({ user, onLogout }: TechnicianPageProps) {
+  const { showToast } = useToast();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [loadingList, setLoadingList] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   // Form state
   const [selectedMachine, setSelectedMachine] = useState(MACHINE_OPTIONS[0]);
@@ -107,8 +107,12 @@ export function TechnicianPage({ user, onLogout }: TechnicianPageProps) {
       const data = await listComplaints(user);
       setComplaints(data);
     } catch (err: unknown) {
-      if (err instanceof ApiError && err.status === 401) onLogout();
-      console.error("Failed to fetch complaints:", err);
+      if (err instanceof ApiError && err.status === 401) {
+        showToast("Session expired. Please log in again.", "error");
+        onLogout();
+        return;
+      }
+      showToast(formatUserFriendlyError(err), "error");
     } finally {
       setLoadingList(false);
     }
@@ -124,8 +128,6 @@ export function TechnicianPage({ user, onLogout }: TechnicianPageProps) {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setError(null);
-    setSuccessMsg(null);
 
     const machineId =
       selectedMachine === "Other" ? customMachine.trim() : selectedMachine;
@@ -133,11 +135,11 @@ export function TechnicianPage({ user, onLogout }: TechnicianPageProps) {
       selectedProblem === "Other" ? customProblem.trim() : selectedProblem;
 
     if (!machineId) {
-      setError("Please specify a Machine ID.");
+      showToast("Please specify a Machine ID.", "warning");
       return;
     }
     if (!problemType) {
-      setError("Please specify a Problem Type.");
+      showToast("Please specify a Problem Type.", "warning");
       return;
     }
 
@@ -152,15 +154,19 @@ export function TechnicianPage({ user, onLogout }: TechnicianPageProps) {
         },
         user
       );
-      setSuccessMsg(`Complaint for ${machineId} submitted successfully.`);
+      showToast(`Complaint for ${machineId} submitted successfully.`, "success");
       // Reset form
       setNotes("");
       if (selectedMachine === "Other") setCustomMachine("");
       if (selectedProblem === "Other") setCustomProblem("");
       fetchComplaints();
     } catch (err: unknown) {
-      if (err instanceof ApiError && err.status === 401) onLogout();
-      setError(err instanceof Error ? err.message : String(err));
+      if (err instanceof ApiError && err.status === 401) {
+        showToast("Session expired. Please log in again.", "error");
+        onLogout();
+        return;
+      }
+      showToast(formatUserFriendlyError(err), "error");
     } finally {
       setSubmitting(false);
     }
@@ -205,17 +211,6 @@ export function TechnicianPage({ user, onLogout }: TechnicianPageProps) {
           </div>
 
           <form onSubmit={handleSubmit} className="form-grid">
-            {error && (
-              <div className="login-error" style={{ gridColumn: "1 / -1" }}>
-                <span>{error}</span>
-              </div>
-            )}
-            {successMsg && (
-              <div className="toast" style={{ position: "static", gridColumn: "1 / -1" }}>
-                <span className="text-success">{successMsg}</span>
-              </div>
-            )}
-
             <div className="form-field">
               <label className="form-label">Machine ID</label>
               <select
@@ -328,71 +323,84 @@ export function TechnicianPage({ user, onLogout }: TechnicianPageProps) {
             </button>
           </div>
 
-          <div className="complaint-list">
-            {complaints.map((item) => (
-              <div
-                key={item.complaint_id}
-                className="complaint-item"
-                data-status={item.status}
-              >
-                <div>
-                  <div className="complaint-id">#{item.complaint_id.slice(0, 8)}</div>
-                  <div className="complaint-title">
-                    {item.machine_id} — {item.problem_type}
-                  </div>
-                  {item.notes && <div className="complaint-meta">{item.notes}</div>}
-                  <div className="complaint-meta">
-                    Submitted: {new Date(item.submitted_at).toLocaleString()}
-                  </div>
-
-                  {item.decision && (
-                    <div className="complaint-decision-mini">
-                      <strong>AI Recommendation:</strong> Action{" "}
-                      <code>{item.decision.recommended_action_id}</code> | Est. Cost: ₹
-                      {Number(item.decision.expected_cost || 0).toLocaleString()} | Downtime:{" "}
-                      {item.decision.expected_downtime}h | Risk:{" "}
-                      {item.decision.expected_risk}
-                    </div>
-                  )}
-
-                  {item.approvals && item.approvals.length > 0 && (
-                    <div className="approval-history-mini">
-                      <strong>Approval Log:</strong>
-                      <ul>
-                        {item.approvals.map((appr, idx) => (
-                          <li key={idx}>
-                            <span
-                              className={
-                                appr.action === "APPROVED"
-                                  ? "text-success"
-                                  : "text-danger"
-                              }
-                            >
-                              {appr.action}
-                            </span>{" "}
-                            by <code>{appr.username}</code> ({appr.role})
-                            {appr.comment ? ` — "${appr.comment}"` : ""}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+          {loadingList && complaints.length === 0 ? (
+            <div className="skeleton-list">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="skeleton-card">
+                  <div className="skeleton-line" style={{ width: "25%", height: "12px", marginBottom: "8px" }} />
+                  <div className="skeleton-line" style={{ width: "65%", height: "16px", marginBottom: "8px" }} />
+                  <div className="skeleton-line" style={{ width: "40%", height: "12px" }} />
                 </div>
-
-                <div className="badge-row">
-                  <span className="severity-badge" data-sev={item.severity}>
-                    {item.severity}
-                  </span>
-                  <StatusBadge status={item.status} />
-                </div>
+              ))}
+            </div>
+          ) : complaints.length === 0 ? (
+            <div className="empty-state empty-state-card animate-fade">
+              <div className="empty-state-icon-wrap">
+                <IconClipboard size={32} />
               </div>
-            ))}
-          </div>
+              <h4 className="empty-state-title">No complaints filed yet.</h4>
+              <p className="empty-state-subtitle">Submit your first complaint above to initiate an automated evaluation.</p>
+            </div>
+          ) : (
+            <div className="complaint-list">
+              {complaints.map((item) => (
+                <div
+                  key={item.complaint_id}
+                  className="complaint-item"
+                  data-status={item.status}
+                >
+                  <div>
+                    <div className="complaint-id">#{item.complaint_id.slice(0, 8)}</div>
+                    <div className="complaint-title">
+                      {item.machine_id} — {item.problem_type}
+                    </div>
+                    {item.notes && <div className="complaint-meta">{item.notes}</div>}
+                    <div className="complaint-meta">
+                      Submitted: {new Date(item.submitted_at).toLocaleString()}
+                    </div>
 
-          {complaints.length === 0 && (
-            <div className="empty-state">
-              <IconClipboard size={32} />
-              <p>No complaints yet. Submit your first one above.</p>
+                    {item.decision && (
+                      <div className="complaint-decision-mini">
+                        <strong>AI Recommendation:</strong> Action{" "}
+                        <code>{item.decision.recommended_action_id}</code> | Est. Cost: ₹
+                        {Number(item.decision.expected_cost || 0).toLocaleString()} | Downtime:{" "}
+                        {item.decision.expected_downtime}h | Risk:{" "}
+                        {item.decision.expected_risk}
+                      </div>
+                    )}
+
+                    {item.approvals && item.approvals.length > 0 && (
+                      <div className="approval-history-mini">
+                        <strong>Approval Log:</strong>
+                        <ul>
+                          {item.approvals.map((appr, idx) => (
+                            <li key={idx}>
+                              <span
+                                className={
+                                  appr.action === "APPROVED"
+                                    ? "text-success"
+                                    : "text-danger"
+                                }
+                              >
+                                {appr.action}
+                              </span>{" "}
+                              by <code>{appr.username}</code> ({appr.role})
+                              {appr.comment ? ` — "${appr.comment}"` : ""}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="badge-row">
+                    <span className="severity-badge" data-sev={item.severity}>
+                      {item.severity}
+                    </span>
+                    <StatusBadge status={item.status} />
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

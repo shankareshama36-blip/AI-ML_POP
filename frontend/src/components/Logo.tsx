@@ -1,13 +1,14 @@
 interface LogoProps {
   className?: string;
+  showDot?: boolean;
 }
 
-export function Logo({ className = "" }: LogoProps) {
+export function Logo({ className = "", showDot = true }: LogoProps) {
   return (
     <span className={`praxis-logo ${className}`.trim()}>
       <svg
-        width="32"
-        height="32"
+        width="30"
+        height="30"
         viewBox="0 0 32 32"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
@@ -22,7 +23,9 @@ export function Logo({ className = "" }: LogoProps) {
         <circle cx="16" cy="16" r="3" fill="#f4f5f7" />
         <circle cx="24" cy="26" r="3.5" fill="#34d399" />
       </svg>
-      <span className="praxis-logo-wordmark">Praxis</span>
+      <span className="praxis-logo-wordmark">
+        Praxis{showDot && <span className="praxis-dot" aria-hidden="true" />}
+      </span>
     </span>
   );
 }

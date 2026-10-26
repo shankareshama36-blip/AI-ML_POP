@@ -7,6 +7,8 @@ import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { TechnicianPage } from "./pages/TechnicianPage";
 import { ApproverPage } from "./pages/ApproverPage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { ToastProvider } from "./components/Toast";
+import { GlobalColdStartOverlay } from "./components/GlobalColdStartOverlay";
 import "./App.css";
 
 type View = "landing" | "login" | "signup" | "forgot" | "app";
@@ -79,49 +81,52 @@ function App() {
 
   return (
     <ErrorBoundary fallbackTitle="Application Error">
-      <div className="animate-fade">
-        {view === "landing" && (
-          <ErrorBoundary fallbackTitle="Landing Page Error">
-            <LandingPage
-              onSignIn={() => setView("login")}
-              onGetStarted={() => setView("signup")}
-            />
-          </ErrorBoundary>
-        )}
+      <ToastProvider>
+        <GlobalColdStartOverlay />
+        <div key={view} className="view-transition">
+          {view === "landing" && (
+            <ErrorBoundary fallbackTitle="Landing Page Error">
+              <LandingPage
+                onSignIn={() => setView("login")}
+                onGetStarted={() => setView("signup")}
+              />
+            </ErrorBoundary>
+          )}
 
-        {view === "login" && (
-          <ErrorBoundary fallbackTitle="Login Error">
-            <LoginPage
-              onLogin={handleLoginSuccess}
-              onBack={() => setView("landing")}
-              onSignup={() => setView("signup")}
-              onForgotPassword={() => setView("forgot")}
-            />
-          </ErrorBoundary>
-        )}
+          {view === "login" && (
+            <ErrorBoundary fallbackTitle="Login Error">
+              <LoginPage
+                onLogin={handleLoginSuccess}
+                onBack={() => setView("landing")}
+                onSignup={() => setView("signup")}
+                onForgotPassword={() => setView("forgot")}
+              />
+            </ErrorBoundary>
+          )}
 
-        {view === "signup" && (
-          <ErrorBoundary fallbackTitle="Sign Up Error">
-            <SignupPage onSignup={handleLoginSuccess} onSignIn={() => setView("login")} />
-          </ErrorBoundary>
-        )}
+          {view === "signup" && (
+            <ErrorBoundary fallbackTitle="Sign Up Error">
+              <SignupPage onSignup={handleLoginSuccess} onSignIn={() => setView("login")} />
+            </ErrorBoundary>
+          )}
 
-        {view === "forgot" && (
-          <ErrorBoundary fallbackTitle="Password Reset Error">
-            <ForgotPasswordPage onSignIn={() => setView("login")} />
-          </ErrorBoundary>
-        )}
+          {view === "forgot" && (
+            <ErrorBoundary fallbackTitle="Password Reset Error">
+              <ForgotPasswordPage onSignIn={() => setView("login")} />
+            </ErrorBoundary>
+          )}
 
-        {view === "app" && user && (
-          <ErrorBoundary fallbackTitle="Dashboard Error">
-            {user.role === "technician" ? (
-              <TechnicianPage user={user} onLogout={handleLogout} />
-            ) : (
-              <ApproverPage user={user} onLogout={handleLogout} />
-            )}
-          </ErrorBoundary>
-        )}
-      </div>
+          {view === "app" && user && (
+            <ErrorBoundary fallbackTitle="Dashboard Error">
+              {user.role === "technician" ? (
+                <TechnicianPage user={user} onLogout={handleLogout} />
+              ) : (
+                <ApproverPage user={user} onLogout={handleLogout} />
+              )}
+            </ErrorBoundary>
+          )}
+        </div>
+      </ToastProvider>
     </ErrorBoundary>
   );
 }

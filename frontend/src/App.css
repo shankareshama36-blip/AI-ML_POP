@@ -1960,3 +1960,377 @@ body { background: var(--bg-base); color: var(--text-primary); }
   .recommendation { align-items: flex-start; }.confidence { display: none; }.approval-path { align-items: flex-start; flex-direction: column; gap: 6px; }
   .cta-final { width: calc(100% - 32px); margin-bottom: 48px; border-radius: 18px; }
 }
+
+/* ==========================================================================
+   ENTERPRISE SAAS ADDITIONS (Cold Start, Toasts, Skeletons, Transitions)
+   ========================================================================== */
+
+/* 1. Praxis Dot */
+.praxis-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 2px;
+  margin-bottom: 2px;
+  vertical-align: middle;
+  border-radius: 50%;
+  background: #3b82f6;
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
+  animation: pulseDot 2.4s ease-in-out infinite;
+}
+
+@keyframes pulseDot {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.9;
+    box-shadow: 0 0 6px rgba(59, 130, 246, 0.6);
+  }
+  50% {
+    transform: scale(1.35);
+    opacity: 1;
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.9);
+  }
+}
+
+/* 2. Global View & Detail Transitions */
+.view-transition {
+  animation: viewFadeIn 250ms ease-out both;
+  width: 100%;
+}
+
+@keyframes viewFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.detail-panel-animated {
+  animation: detailSlideIn 250ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes detailSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 3. Global Cold Start Overlay */
+.coldstart-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(11, 18, 32, 0.76);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.coldstart-modal {
+  width: 100%;
+  max-width: 440px;
+  background: #ffffff;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  padding: 32px 28px;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: coldstartPop 250ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes coldstartPop {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.coldstart-header {
+  margin-bottom: 24px;
+}
+
+.coldstart-spinner-wrap {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.coldstart-spinner {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 3px solid rgba(37, 99, 235, 0.15);
+  border-top-color: var(--brand);
+  animation: spin 900ms linear infinite;
+}
+
+.coldstart-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  letter-spacing: -0.02em;
+}
+
+.coldstart-desc {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+  max-width: 360px;
+}
+
+.coldstart-progress-track {
+  width: 100%;
+  height: 4px;
+  background: #e2e8f0;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin-bottom: 20px;
+  position: relative;
+}
+
+.coldstart-progress-bar {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #1d4ed8, #60a5fa);
+  border-radius: var(--radius-full);
+  animation: coldstartProgress 2.2s ease-in-out infinite;
+  transform-origin: 0% 50%;
+}
+
+@keyframes coldstartProgress {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.coldstart-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-subtle);
+  letter-spacing: 0.02em;
+}
+
+/* 4. Toast Notification Portal (Bottom Right Corner) */
+.toast-portal {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 420px;
+  width: calc(100% - 48px);
+  pointer-events: none;
+}
+
+.toast-card {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  color: var(--text-primary);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.14), 0 1px 3px rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--border-subtle);
+  font-size: 13px;
+  line-height: 1.45;
+  transition: transform 180ms ease, opacity 180ms ease;
+  animation: toastSlideIn 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.toast-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toast-content {
+  flex: 1;
+  font-weight: 500;
+  color: var(--text-secondary);
+  word-break: break-word;
+}
+
+.toast-close-btn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 2px;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 150ms ease, background 150ms ease;
+}
+
+.toast-close-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+}
+
+.toast-error {
+  border-left: 4px solid var(--danger);
+}
+.toast-error .toast-icon {
+  color: var(--danger);
+}
+
+.toast-success {
+  border-left: 4px solid var(--success);
+}
+.toast-success .toast-icon {
+  color: var(--success);
+}
+
+.toast-warning {
+  border-left: 4px solid var(--warning);
+}
+.toast-warning .toast-icon {
+  color: var(--warning);
+}
+
+.toast-info {
+  border-left: 4px solid var(--brand);
+}
+.toast-info .toast-icon {
+  color: var(--brand);
+}
+
+/* 5. Skeleton Loaders */
+.skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.skeleton-card {
+  padding: 16px;
+  background: #ffffff;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+}
+
+.skeleton-line {
+  background: linear-gradient(
+    90deg,
+    #e2e8f0 0%,
+    #f1f5f9 50%,
+    #e2e8f0 100%
+  );
+  background-size: 200% 100%;
+  border-radius: 4px;
+  animation: skeletonShimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes skeletonShimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* 6. Empty States */
+.empty-state-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 24px;
+  background: #fbfcfe;
+  border: 1.5px dashed var(--border-default);
+  border-radius: var(--radius-lg);
+  margin: 8px 0;
+}
+
+.empty-state-icon-wrap {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.empty-state-icon-wrap.success {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.empty-state-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.empty-state-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  max-width: 340px;
+  line-height: 1.45;
+}
+
