@@ -15,6 +15,7 @@ import {
   IconClock,
   IconSpinner,
   IconLogout,
+  IconSettings,
 } from "../components/Icons";
 import { Logo } from "../components/Logo";
 import { useToast, formatUserFriendlyError } from "../components/Toast";
@@ -22,6 +23,7 @@ import { useToast, formatUserFriendlyError } from "../components/Toast";
 interface TechnicianPageProps {
   user: User;
   onLogout: () => void;
+  onOpenSettings?: () => void;
 }
 
 const MACHINE_OPTIONS = [
@@ -85,7 +87,7 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-export function TechnicianPage({ user, onLogout }: TechnicianPageProps) {
+export function TechnicianPage({ user, onLogout, onOpenSettings }: TechnicianPageProps) {
   const { showToast } = useToast();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [loadingList, setLoadingList] = useState(false);
@@ -187,6 +189,17 @@ export function TechnicianPage({ user, onLogout }: TechnicianPageProps) {
             <div className="user-avatar">{user.email.slice(0, 1)}</div>
             <span>{user.email}</span>
           </div>
+          {(user.role === "plant_manager" || Boolean(user.is_admin)) && onOpenSettings && (
+            <button
+              type="button"
+              className="action-btn secondary"
+              style={{ padding: "6px 12px", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: "6px" }}
+              onClick={onOpenSettings}
+              title="Workspace Settings & Thresholds"
+            >
+              <IconSettings size={14} /> Settings
+            </button>
+          )}
           <button type="button" className="logout-btn" onClick={onLogout}>
             <IconLogout size={14} /> Logout
           </button>

@@ -36,6 +36,7 @@ function evaluatePassword(password: string) {
 }
 
 export function SignupPage({ onSignup, onSignIn }: SignupPageProps) {
+  const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -49,6 +50,9 @@ export function SignupPage({ onSignup, onSignIn }: SignupPageProps) {
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError(null);
+    if (!companyName.trim() || companyName.trim().length < 2) {
+      return setError("Enter your company or organization name (at least 2 characters).");
+    }
     if (!/^\S+@\S+\.\S+$/.test(email)) {
       return setError("Enter a valid email address.");
     }
@@ -61,7 +65,7 @@ export function SignupPage({ onSignup, onSignIn }: SignupPageProps) {
 
     setLoading(true);
     try {
-      const result = await signup(email.trim(), password, role);
+      const result = await signup(email.trim(), password, role, companyName.trim());
       setSuccess(true);
       setTimeout(() => {
         onSignup(result.user, result.token);
@@ -106,7 +110,7 @@ export function SignupPage({ onSignup, onSignIn }: SignupPageProps) {
     <div className="login-page animate-fade">
       <div className="login-card animate-scale">
         <div className="login-logo"><Logo /></div>
-        <p className="login-tagline">Create your technician workspace account.</p>
+        <p className="login-tagline">Create your Company Workspace</p>
         <form onSubmit={submit} className="login-form">
           {error && (
             <div className="login-error" role="alert">
@@ -114,6 +118,20 @@ export function SignupPage({ onSignup, onSignIn }: SignupPageProps) {
               <span>{error}</span>
             </div>
           )}
+
+          <div className="login-field">
+            <label htmlFor="signup-company">Company / Organization Name</label>
+            <input
+              id="signup-company"
+              type="text"
+              placeholder="e.g. Acme Industrial Corp"
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              disabled={loading}
+              required
+              minLength={2}
+            />
+          </div>
 
           <div className="login-field">
             <label htmlFor="signup-email">Email</label>
@@ -289,7 +307,7 @@ export function SignupPage({ onSignup, onSignIn }: SignupPageProps) {
           <button
             type="submit"
             className="login-btn"
-            disabled={loading || !email.trim() || !allMet || password !== confirm}
+            disabled={loading || !companyName.trim() || !email.trim() || !allMet || password !== confirm}
           >
             {loading ? (
               <>

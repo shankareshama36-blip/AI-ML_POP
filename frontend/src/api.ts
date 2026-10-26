@@ -4,6 +4,9 @@ export interface User {
   id: number;
   email: string;
   role: string;
+  tenant_id?: string;
+  company_name?: string;
+  is_admin?: boolean;
 }
 
 export interface ComplaintCreateInput {
@@ -286,8 +289,13 @@ export async function signup(
   email: string,
   password: string,
   role: "technician" | "maintenance_supervisor" | "production_supervisor" | "plant_manager" = "technician",
+  company_name?: string,
+  invite_code?: string,
 ): Promise<AuthResult> {
-  return request<AuthResult>("/auth/signup", { method: "POST", body: JSON.stringify({ email, password, role }) });
+  const body: Record<string, string> = { email, password, role };
+  if (company_name && company_name.trim()) body.company_name = company_name.trim();
+  if (invite_code && invite_code.trim()) body.invite_code = invite_code.trim();
+  return request<AuthResult>("/auth/signup", { method: "POST", body: JSON.stringify(body) });
 }
 
 const DEMO_ACCOUNT_IDENTIFIERS = new Set([
@@ -495,4 +503,41 @@ export async function getDecisionsCount(): Promise<number> {
   } catch {
     return 0;
   }
+}
+
+export interface Thresholds {
+  tier1_max: number;
+  tier2_max: number;
+}
+
+export interface WorkspaceMember {
+  email: string;
+  role: string;
+  is_admin: boolean;
+}
+
+export interface Workspace {
+  tenant_id: string;
+  company_name: string;
+  invite_code: string;
+  members: WorkspaceMember[];
+}
+
+export async function getThresholds(): Promise<Thresholds> {
+  return request<Thresholds>("/settings/thresholds", { method: "GET" });
+}
+
+export async function updateThresholds(tier1_max: number, tier2_max: number): Promise<Thresholds> {
+  return request<Thresholds>("/settings/thresholds", {
+    method: "PUT",
+    body: JSON.stringify({ tier1_max, tier2_max }),
+  });
+}
+
+export async function getWorkspace(): Promise<Workspace> {
+  return request<Workspace>("/settings/workspace", { method: "GET" });
+}
+
+export async function rotateInviteCode(): Promise<Workspace> {
+  return request<Workspace>("/settings/workspace/invite-code", { method: "POST" });
 }

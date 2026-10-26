@@ -9,15 +9,17 @@ import { SignupPage } from "./pages/SignupPage";
 import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { TechnicianPage } from "./pages/TechnicianPage";
 import { ApproverPage } from "./pages/ApproverPage";
+import { PricingPage } from "./pages/PricingPage";
+import { SettingsPage } from "./pages/SettingsPage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ToastProvider } from "./components/Toast";
 import { GlobalColdStartOverlay } from "./components/GlobalColdStartOverlay";
 import { LandingLayout, type PublicView } from "./components/LandingLayout";
 import "./App.css";
 
-type View = "landing" | "about" | "contact" | "legal" | "login" | "signup" | "forgot" | "app";
+type View = "landing" | "pricing" | "about" | "contact" | "legal" | "login" | "signup" | "forgot" | "app" | "settings";
 
-const PUBLIC_VIEWS: Set<string> = new Set(["landing", "about", "contact", "legal"]);
+const PUBLIC_VIEWS: Set<string> = new Set(["landing", "pricing", "about", "contact", "legal"]);
 
 function App() {
   const [view, setView] = useState<View>("landing");
@@ -113,6 +115,14 @@ function App() {
                   />
                 </ErrorBoundary>
               )}
+              {view === "pricing" && (
+                <ErrorBoundary fallbackTitle="Pricing Page Error">
+                  <PricingPage
+                    onNavigate={handleNavigate}
+                    onGetStarted={() => setView("signup")}
+                  />
+                </ErrorBoundary>
+              )}
               {view === "about" && (
                 <ErrorBoundary fallbackTitle="About Page Error">
                   <AboutPage onNavigate={handleNavigate} onGetStarted={() => setView("signup")} />
@@ -159,10 +169,35 @@ function App() {
           {view === "app" && user && (
             <ErrorBoundary fallbackTitle="Dashboard Error">
               {user.role === "technician" ? (
-                <TechnicianPage user={user} onLogout={handleLogout} />
+                <TechnicianPage
+                  user={user}
+                  onLogout={handleLogout}
+                  onOpenSettings={
+                    user.is_admin ? () => setView("settings") : undefined
+                  }
+                />
               ) : (
-                <ApproverPage user={user} onLogout={handleLogout} />
+                <ApproverPage
+                  user={user}
+                  onLogout={handleLogout}
+                  onOpenSettings={
+                    user.role === "plant_manager" || Boolean(user.is_admin)
+                      ? () => setView("settings")
+                      : undefined
+                  }
+                />
               )}
+            </ErrorBoundary>
+          )}
+
+          {/* ── Settings page ── */}
+          {view === "settings" && user && (
+            <ErrorBoundary fallbackTitle="Settings Error">
+              <SettingsPage
+                user={user}
+                onBack={() => setView("app")}
+                onLogout={handleLogout}
+              />
             </ErrorBoundary>
           )}
         </div>

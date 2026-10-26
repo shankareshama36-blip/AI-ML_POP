@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Logo } from "./Logo";
 import { IconArrowRight } from "./Icons";
 
-export type PublicView = "landing" | "about" | "contact" | "legal" | "login" | "signup";
+export type PublicView = "landing" | "about" | "contact" | "legal" | "pricing" | "login" | "signup";
 
 interface LandingLayoutProps {
   children: ReactNode;
@@ -58,6 +58,14 @@ export function LandingLayout({
             role="menuitem"
           >
             Platform
+          </button>
+          <button
+            type="button"
+            className={`nav-link ${currentView === "pricing" ? "active" : ""}`}
+            onClick={() => handleNavLink("pricing")}
+            role="menuitem"
+          >
+            Pricing
           </button>
           <button
             type="button"
@@ -142,6 +150,13 @@ export function LandingLayout({
               onClick={() => handleNavLink("about")}
             >
               DFA Guardrails
+            </button>
+            <button
+              type="button"
+              className="footer-link-btn"
+              onClick={() => handleNavLink("pricing")}
+            >
+              Plans & Pricing
             </button>
           </div>
 
