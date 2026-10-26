@@ -156,11 +156,49 @@ export class ApiError extends Error {
   }
 }
 
+type SlowLoadingListener = (isSlow: boolean) => void;
+const slowLoadingListeners: Set<SlowLoadingListener> = new Set();
+let inFlightCount = 0;
+let slowTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function subscribeSlowLoading(listener: SlowLoadingListener): () => void {
+  slowLoadingListeners.add(listener);
+  return () => {
+    slowLoadingListeners.delete(listener);
+  };
+}
+
+function startRequestTimer() {
+  inFlightCount++;
+  if (inFlightCount === 1) {
+    if (slowTimer) clearTimeout(slowTimer);
+    slowTimer = setTimeout(() => {
+      if (inFlightCount > 0) {
+        slowLoadingListeners.forEach((fn) => fn(true));
+      }
+    }, 2000);
+  }
+}
+
+function endRequestTimer() {
+  inFlightCount = Math.max(0, inFlightCount - 1);
+  if (inFlightCount === 0) {
+    if (slowTimer) {
+      clearTimeout(slowTimer);
+      slowTimer = null;
+    }
+    slowLoadingListeners.forEach((fn) => fn(false));
+  }
+}
+
 export async function fetchWithTimeout(
   url: string,
   options: RequestInit = {},
   timeoutMs = 60000
 ): Promise<Response> {
+  const isHealthCheck = url.includes("/health");
+  if (!isHealthCheck) startRequestTimer();
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -184,6 +222,7 @@ export async function fetchWithTimeout(
     throw error;
   } finally {
     clearTimeout(timeoutId);
+    if (!isHealthCheck) endRequestTimer();
   }
 }
 
