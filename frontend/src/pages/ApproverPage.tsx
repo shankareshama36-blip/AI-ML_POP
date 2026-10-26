@@ -162,7 +162,15 @@ export function ApproverPage({ user, onLogout }: ApproverPageProps) {
       setComplaints((prev) =>
         prev.map((c) => (c.complaint_id === updated.complaint_id ? updated : c))
       );
-      showToast("Approval recorded successfully.", "success");
+      if (updated.status === "PENDING_PROD") {
+        showToast("Approved! Forwarded to Production Supervisor for tier-2 review.", "success");
+      } else if (updated.status === "PENDING_PLANT") {
+        showToast("Approved! Forwarded to Plant Manager for executive review.", "success");
+      } else if (updated.status === "APPROVED") {
+        showToast("Approval complete. Operational decision fully authorized.", "success");
+      } else {
+        showToast("Approval recorded successfully.", "success");
+      }
       await fetchComplaints();
     } catch (err: unknown) {
       if (err instanceof ApiError && err.status === 401) {
@@ -206,9 +214,22 @@ export function ApproverPage({ user, onLogout }: ApproverPageProps) {
     : false;
 
   const chainRoles =
-    selectedComplaint && selectedComplaint.approval_chain.length > 0
+    selectedComplaint && selectedComplaint.approval_chain && selectedComplaint.approval_chain.length > 0
       ? selectedComplaint.approval_chain
+      : selectedComplaint?.decision?.expected_cost !== undefined
+      ? selectedComplaint.decision.expected_cost < 10000
+        ? ["maintenance_supervisor"]
+        : selectedComplaint.decision.expected_cost < 50000
+        ? ["maintenance_supervisor", "production_supervisor"]
+        : ["maintenance_supervisor", "production_supervisor", "plant_manager"]
       : ["maintenance_supervisor", "production_supervisor", "plant_manager"];
+
+  const queueTitle =
+    user.role === "production_supervisor"
+      ? "Production Review Queue"
+      : user.role === "plant_manager"
+      ? "Executive Review Queue"
+      : "Pending Review Queue";
 
   return (
     <div className="app-shell animate-fade">
@@ -234,7 +255,7 @@ export function ApproverPage({ user, onLogout }: ApproverPageProps) {
       {/* Main Page Area */}
       <main className="page-main" style={{ maxWidth: "1200px" }}>
         <div className="page-header">
-          <h1 className="page-title">Approval Queue</h1>
+          <h1 className="page-title">{queueTitle}</h1>
           <p className="page-subtitle">
             Inspect automated decision intelligence and authorize operational actions.
           </p>
@@ -245,7 +266,8 @@ export function ApproverPage({ user, onLogout }: ApproverPageProps) {
           <div className="card" style={{ marginBottom: 0 }}>
             <div className="card-header">
               <div className="card-title">
-                <IconList size={18} /> Pending Review Queue
+                <IconList size={18} /> {queueTitle}{" "}
+                <span className="status-badge pending">{complaints.length}</span>
               </div>
               <button
                 type="button"
@@ -275,7 +297,13 @@ export function ApproverPage({ user, onLogout }: ApproverPageProps) {
                   <IconCheck size={28} />
                 </div>
                 <h4 className="empty-state-title">All clear</h4>
-                <p className="empty-state-subtitle">No complaints waiting for your approval.</p>
+                <p className="empty-state-subtitle">
+                  {user.role === "production_supervisor"
+                    ? "No complaints waiting for Production Supervisor review."
+                    : user.role === "plant_manager"
+                    ? "No complaints waiting for Plant Manager authorization."
+                    : "No complaints waiting for your approval."}
+                </p>
               </div>
             ) : (
               <div className="complaint-list" role="listbox" aria-label="Complaints pending review">

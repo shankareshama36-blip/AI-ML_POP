@@ -18,10 +18,10 @@ def authenticate(username: str, password: str) -> dict[str, str] | None:
     return None
 
 
-def get_approval_chain(expected_cost: float) -> list[str]:
-    """Return the ordered list of roles that must approve, based on cost."""
-    if expected_cost < 10_000:
+def get_approval_chain(expected_cost: float, tier1_max: float, tier2_max: float) -> list[str]:
+    """Return the ordered list of roles that must approve, given tenant thresholds."""
+    if expected_cost < tier1_max:
         return ["maintenance_supervisor"]
-    if expected_cost < 50_000:
+    if expected_cost < tier2_max:
         return ["maintenance_supervisor", "production_supervisor"]
     return ["maintenance_supervisor", "production_supervisor", "plant_manager"]

@@ -4,7 +4,7 @@ import {
   IconArrowRight, IconCheckCircle, IconClipboard, IconClock,
   IconCpu, IconLayers, IconSearch, IconShield, IconTrending, IconWrench,
 } from "../components/Icons";
-import { Logo } from "../components/Logo";
+
 
 interface LandingPageProps {
   onSignIn: () => void;
@@ -39,7 +39,7 @@ const roles: Array<{ title: string; description: string; icon: Icon; level: numb
   { title: "Plant Manager", description: "Provide final safety and financial accountability.", icon: IconShield, level: 4 },
 ];
 
-export function LandingPage({ onSignIn, onGetStarted }: LandingPageProps) {
+export function LandingPage({ onSignIn: _onSignIn, onGetStarted }: LandingPageProps) {
   const [decisionCount, setDecisionCount] = useState(0);
 
   useEffect(() => {
@@ -57,13 +57,6 @@ export function LandingPage({ onSignIn, onGetStarted }: LandingPageProps) {
 
   return (
     <div className="landing-page animate-fade">
-      <nav className="landing-nav" aria-label="Primary navigation">
-        <button type="button" className="landing-nav-logo" onClick={() => scrollTo("top")} aria-label="Praxis home"><Logo /></button>
-        <div className="landing-nav-actions">
-          <button type="button" className="nav-signin" onClick={onSignIn}>Sign in</button>
-          <button type="button" className="landing-nav-btn" onClick={onGetStarted}>Get Started Free <IconArrowRight size={14} /></button>
-        </div>
-      </nav>
 
       <header id="top" className="hero hero-premium">
         <div className="hero-inner">
@@ -157,10 +150,6 @@ export function LandingPage({ onSignIn, onGetStarted }: LandingPageProps) {
         </div>
       </section>
 
-      <footer className="landing-footer">
-        <div className="footer-grid"><div className="footer-brand"><Logo /><p>Decision intelligence for autonomous operations.</p></div><div><h3>Product</h3><a href="#features">Capabilities</a><a href="#how">Decision loop</a><a href="#team">Roles</a></div><div><h3>Docs</h3><a href="#academic">Methodology</a><a href="#how">System architecture</a><a href="#features">Security</a></div><div><h3>Company</h3><a href="#top">About</a><a href="#top">Contact</a><a href="#top">Legal</a></div></div>
-        <div className="footer-bottom"><span>© 2026 Praxis Platform. All rights reserved.</span><span>Built for accountable operations.</span></div>
-      </footer>
     </div>
   );
 }

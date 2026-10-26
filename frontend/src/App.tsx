@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import { ApiError, logout, pingHealth, verifyToken, type User } from "./api";
 import { LandingPage } from "./pages/LandingPage";
+import { AboutPage } from "./pages/AboutPage";
+import { ContactPage } from "./pages/ContactPage";
+import { LegalPage } from "./pages/LegalPage";
 import { LoginPage } from "./pages/LoginPage";
 import { SignupPage } from "./pages/SignupPage";
 import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
@@ -9,9 +12,12 @@ import { ApproverPage } from "./pages/ApproverPage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ToastProvider } from "./components/Toast";
 import { GlobalColdStartOverlay } from "./components/GlobalColdStartOverlay";
+import { LandingLayout, type PublicView } from "./components/LandingLayout";
 import "./App.css";
 
-type View = "landing" | "login" | "signup" | "forgot" | "app";
+type View = "landing" | "about" | "contact" | "legal" | "login" | "signup" | "forgot" | "app";
+
+const PUBLIC_VIEWS: Set<string> = new Set(["landing", "about", "contact", "legal"]);
 
 function App() {
   const [view, setView] = useState<View>("landing");
@@ -77,22 +83,55 @@ function App() {
     setView("login");
   }
 
+  function handleNavigate(target: PublicView) {
+    setView(target as View);
+  }
+
   if (restoringSession) return null;
+
+  const isPublicView = PUBLIC_VIEWS.has(view);
 
   return (
     <ErrorBoundary fallbackTitle="Application Error">
       <ToastProvider>
         <GlobalColdStartOverlay />
         <div key={view} className="view-transition">
-          {view === "landing" && (
-            <ErrorBoundary fallbackTitle="Landing Page Error">
-              <LandingPage
-                onSignIn={() => setView("login")}
-                onGetStarted={() => setView("signup")}
-              />
-            </ErrorBoundary>
+
+          {/* ── Public views wrapped in shared LandingLayout nav + footer ── */}
+          {isPublicView && (
+            <LandingLayout
+              onNavigate={handleNavigate}
+              onSignIn={() => setView("login")}
+              onGetStarted={() => setView("signup")}
+              currentView={view as PublicView}
+            >
+              {view === "landing" && (
+                <ErrorBoundary fallbackTitle="Landing Page Error">
+                  <LandingPage
+                    onSignIn={() => setView("login")}
+                    onGetStarted={() => setView("signup")}
+                  />
+                </ErrorBoundary>
+              )}
+              {view === "about" && (
+                <ErrorBoundary fallbackTitle="About Page Error">
+                  <AboutPage onNavigate={handleNavigate} onGetStarted={() => setView("signup")} />
+                </ErrorBoundary>
+              )}
+              {view === "contact" && (
+                <ErrorBoundary fallbackTitle="Contact Page Error">
+                  <ContactPage onNavigate={handleNavigate} />
+                </ErrorBoundary>
+              )}
+              {view === "legal" && (
+                <ErrorBoundary fallbackTitle="Legal Page Error">
+                  <LegalPage onNavigate={handleNavigate} />
+                </ErrorBoundary>
+              )}
+            </LandingLayout>
           )}
 
+          {/* ── Auth views ── */}
           {view === "login" && (
             <ErrorBoundary fallbackTitle="Login Error">
               <LoginPage
@@ -116,6 +155,7 @@ function App() {
             </ErrorBoundary>
           )}
 
+          {/* ── App dashboard ── */}
           {view === "app" && user && (
             <ErrorBoundary fallbackTitle="Dashboard Error">
               {user.role === "technician" ? (

@@ -26,3 +26,48 @@ def test_approval_chain_transitions_for_all_cost_thresholds() -> None:
         for role, expected_status in zip(roles, expected_statuses, strict=True):
             updated = approve_complaint(complaint.complaint_id, f"{role}@praxis.local", role)
             assert updated.status == expected_status
+
+
+def test_role_must_match_current_pending_status() -> None:
+    """Verifies that unauthorized roles cannot approve complaints out of order."""
+    import pytest
+
+    init_db()
+    clear_complaints()
+
+    complaint = create_complaint(
+        ComplaintCreate(machine_id="M-102", problem_type="Spindle Bearing Wear", severity="CRITICAL"),
+        submitted_by="tech@praxis.local",
+    )
+    attach_decision(complaint.complaint_id, {"expected_cost": 55_000}, 55_000)
+
+    # Status is PENDING_MAINT; production_supervisor and plant_manager must be rejected
+    with pytest.raises(ValueError, match="cannot approve"):
+        approve_complaint(complaint.complaint_id, "prod@praxis.local", "production_supervisor")
+    with pytest.raises(ValueError, match="cannot approve"):
+        approve_complaint(complaint.complaint_id, "plant@praxis.local", "plant_manager")
+
+    # Maintenance supervisor approves -> transitions to PENDING_PROD
+    step1 = approve_complaint(complaint.complaint_id, "maint@praxis.local", "maintenance_supervisor")
+    assert step1.status == "PENDING_PROD"
+
+    # Status is now PENDING_PROD; maintenance_supervisor and plant_manager must be rejected
+    with pytest.raises(ValueError, match="cannot approve"):
+        approve_complaint(complaint.complaint_id, "maint@praxis.local", "maintenance_supervisor")
+    with pytest.raises(ValueError, match="cannot approve"):
+        approve_complaint(complaint.complaint_id, "plant@praxis.local", "plant_manager")
+
+    # Production supervisor approves -> transitions to PENDING_PLANT
+    step2 = approve_complaint(complaint.complaint_id, "prod@praxis.local", "production_supervisor")
+    assert step2.status == "PENDING_PLANT"
+
+    # Status is now PENDING_PLANT; maintenance_supervisor and production_supervisor must be rejected
+    with pytest.raises(ValueError, match="cannot approve"):
+        approve_complaint(complaint.complaint_id, "maint@praxis.local", "maintenance_supervisor")
+    with pytest.raises(ValueError, match="cannot approve"):
+        approve_complaint(complaint.complaint_id, "prod@praxis.local", "production_supervisor")
+
+    # Plant manager approves -> transitions to APPROVED
+    step3 = approve_complaint(complaint.complaint_id, "plant@praxis.local", "plant_manager")
+    assert step3.status == "APPROVED"
+

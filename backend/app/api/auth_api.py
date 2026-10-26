@@ -10,7 +10,7 @@ from email.utils import parseaddr
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy.exc import IntegrityError
@@ -22,7 +22,7 @@ from backend.app.auth_real import (
     validate_password,
     verify_password,
 )
-from backend.app.db import PasswordResetToken, SessionLocal, User
+from backend.app.db import PasswordResetToken, SessionLocal, Tenant, User, create_tenant
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -31,7 +31,13 @@ CurrentUser = Annotated[dict[str, object], Depends(get_current_user)]
 
 
 class SignupRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    """Create a new company workspace (``company_name``) or join one (``invite_code``).
+
+    Joining by company name is deliberately unsupported: names are guessable,
+    so anyone could attach themselves to another company's tenant.
+    """
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     email: EmailStr = Field(..., max_length=254)
     password: str = Field(..., min_length=12, max_length=128)
     role: Literal[
@@ -40,6 +46,14 @@ class SignupRequest(BaseModel):
         "production_supervisor",
         "plant_manager",
     ]
+    company_name: str | None = Field(default=None, min_length=2, max_length=120)
+    invite_code: str | None = Field(default=None, min_length=8, max_length=64)
+
+    @model_validator(mode="after")
+    def _exactly_one_workspace_source(self) -> SignupRequest:
+        if bool(self.company_name) == bool(self.invite_code):
+            raise ValueError("Provide either company_name (new workspace) or invite_code (join workspace)")
+        return self
 
 
 class LoginRequest(BaseModel):
@@ -66,6 +80,9 @@ class UserResponse(BaseModel):
     id: int
     email: str
     role: str
+    tenant_id: str
+    company_name: str
+    is_admin: bool
 
 
 class AuthResponse(BaseModel):
@@ -84,7 +101,17 @@ def _valid_email(email: str) -> bool:
 
 
 def _auth_response(user: User) -> AuthResponse:
-    return AuthResponse(token=create_jwt(user.id, user.role), user=UserResponse(id=user.id, email=user.email, role=user.role))
+    return AuthResponse(
+        token=create_jwt(user.id, user.role, user.tenant_id),
+        user=UserResponse(
+            id=user.id,
+            email=user.email,
+            role=user.role,
+            tenant_id=str(user.tenant_id),
+            company_name=user.company_name,
+            is_admin=bool(user.is_admin),
+        ),
+    )
 
 
 def _token_hash(token: str) -> str:
@@ -103,7 +130,27 @@ def signup(request: Request, payload: SignupRequest) -> AuthResponse:
         ) from exc
     email = payload.email.strip().lower()
     with SessionLocal() as session:
-        user = User(email=email, password_hash=hash_password(payload.password), role=payload.role)
+        if payload.invite_code:
+            tenant = session.query(Tenant).filter_by(invite_code=payload.invite_code).first()
+            if tenant is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invite code is invalid or has been rotated",
+                )
+        else:
+            tenant = create_tenant(session, str(payload.company_name))
+        # The first member of a workspace becomes its administrator.
+        is_first_member = (
+            session.query(User.id).filter(User.tenant_id == tenant.id).first() is None
+        )
+        user = User(
+            email=email,
+            password_hash=hash_password(payload.password),
+            role=payload.role,
+            tenant_id=tenant.id,
+            company_name=tenant.name,
+            is_admin=is_first_member,
+        )
         session.add(user)
         try:
             session.flush()
@@ -112,7 +159,6 @@ def signup(request: Request, payload: SignupRequest) -> AuthResponse:
         except IntegrityError as exc:
             session.rollback()
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email is already registered") from exc
-        session.refresh(user)
         return response
 
 

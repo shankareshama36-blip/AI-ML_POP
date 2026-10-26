@@ -19,6 +19,11 @@ DEMO_ACCOUNTS_ENABLED = os.getenv(
     "true",
 ).lower() in {"1", "true", "yes"}
 
+# Seed values for a new tenant's ApprovalThresholds row. Runtime approval logic
+# must always read the tenant's persisted thresholds, never these constants.
+DEFAULT_TIER1_MAX = 10_000.0
+DEFAULT_TIER2_MAX = 50_000.0
+
 # Always include known production frontend origins so the app works
 # regardless of what ALLOWED_ORIGINS env var is set to on the host.
 _PRODUCTION_ORIGINS = [
