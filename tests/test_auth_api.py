@@ -66,7 +66,7 @@ def test_signup_and_password_reset_flow() -> None:
 
     signup = client.post(
         "/auth/signup",
-        json={"email": email, "password": original_password, "role": "technician"},
+        json={"email": email, "password": original_password, "role": "technician", "company_name": "TestCorp"},
     )
     assert signup.status_code == 201
 

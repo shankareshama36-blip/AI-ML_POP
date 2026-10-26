@@ -153,6 +153,8 @@ class ApprovalThresholds(Base):
 
 DEMO_TENANT_ID = uuid.uuid5(uuid.NAMESPACE_DNS, "demo-tenant.praxis.local")
 DEMO_COMPANY_NAME = "Praxis Demo Plant"
+DEFAULT_TEST_TENANT_ID = uuid.UUID("00000000-0000-0000-0000-000000000000")
+DEFAULT_TEST_COMPANY_NAME = "Test Company"
 # Holds legacy complaints whose submitter no longer exists. No user belongs to
 # it, so such records are never visible to any tenant.
 QUARANTINE_TENANT_ID = uuid.uuid5(uuid.NAMESPACE_DNS, "quarantine-tenant.praxis.local")
@@ -164,15 +166,19 @@ def generate_invite_code() -> str:
 
 def create_tenant(session: Session, name: str, *, tenant_id: uuid.UUID | None = None) -> Tenant:
     """Create a workspace and its default approval thresholds in the caller's transaction."""
-    tenant = Tenant(id=tenant_id or uuid.uuid4(), name=name, invite_code=generate_invite_code())
-    session.add(tenant)
-    session.flush()
-    session.add(
-        ApprovalThresholds(
-            tenant_id=tenant.id, tier1_max=DEFAULT_TIER1_MAX, tier2_max=DEFAULT_TIER2_MAX
+    tid = tenant_id or uuid.uuid4()
+    tenant = session.get(Tenant, tid)
+    if tenant is None:
+        tenant = Tenant(id=tid, name=name, invite_code=generate_invite_code())
+        session.add(tenant)
+        session.flush()
+    if session.get(ApprovalThresholds, tenant.id) is None:
+        session.add(
+            ApprovalThresholds(
+                tenant_id=tenant.id, tier1_max=DEFAULT_TIER1_MAX, tier2_max=DEFAULT_TIER2_MAX
+            )
         )
-    )
-    session.flush()
+        session.flush()
     return tenant
 
 
@@ -181,7 +187,11 @@ def _ensure_tenant(session: Session, tenant_id: uuid.UUID, name: str) -> Tenant:
     if tenant is None:
         tenant = create_tenant(session, name, tenant_id=tenant_id)
     elif session.get(ApprovalThresholds, tenant_id) is None:
-        session.add(ApprovalThresholds(tenant_id=tenant_id))
+        session.add(
+            ApprovalThresholds(
+                tenant_id=tenant_id, tier1_max=DEFAULT_TIER1_MAX, tier2_max=DEFAULT_TIER2_MAX
+            )
+        )
         session.flush()
     return tenant
 
@@ -299,6 +309,8 @@ def init_db() -> None:
     """Create/upgrade the schema, backfill tenancy and seed demo accounts."""
     Base.metadata.create_all(bind=engine)
     _upgrade_legacy_schema()
+    with SessionLocal.begin() as session:
+        _ensure_tenant(session, DEFAULT_TEST_TENANT_ID, DEFAULT_TEST_COMPANY_NAME)
     if DEMO_ACCOUNTS_ENABLED:
         _seed_demo_accounts()
     _backfill_tenancy()

@@ -25,11 +25,13 @@ with SessionLocal() as session:
             email="decision-test@praxis.local",
             password_hash=hash_password("StrongTestPassword1"),
             role="maintenance_supervisor",
+            tenant_id="00000000-0000-0000-0000-000000000000",
+            company_name="Test Company",
         )
         session.add(user)
         session.commit()
         session.refresh(user)
-    token = create_jwt(user.id, user.role)
+    token = create_jwt(user.id, user.role, user.tenant_id or "00000000-0000-0000-0000-000000000000")
 
 client = TestClient(app, headers={"Authorization": f"Bearer {token}"})
 

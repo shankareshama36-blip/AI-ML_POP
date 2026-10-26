@@ -39,6 +39,9 @@ def get_thresholds(tenant_id: UUID | str) -> Thresholds:
     with SessionLocal() as session:
         row = session.get(ApprovalThresholds, tid)
         if row is None:
+            if session.get(Tenant, tid) is None:
+                session.add(Tenant(id=tid, name="Workspace", invite_code=generate_invite_code()))
+                session.flush()
             row = ApprovalThresholds(
                 tenant_id=tid, tier1_max=DEFAULT_TIER1_MAX, tier2_max=DEFAULT_TIER2_MAX
             )
@@ -56,6 +59,9 @@ def update_thresholds(
     with SessionLocal() as session:
         row = session.get(ApprovalThresholds, tid)
         if row is None:
+            if session.get(Tenant, tid) is None:
+                session.add(Tenant(id=tid, name="Workspace", invite_code=generate_invite_code()))
+                session.flush()
             row = ApprovalThresholds(tenant_id=tid)
             session.add(row)
         row.tier1_max = round(float(tier1_max), 2)
