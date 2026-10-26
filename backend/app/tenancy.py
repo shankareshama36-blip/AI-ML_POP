@@ -28,47 +28,98 @@ def as_tenant_uuid(tenant_id: UUID | str) -> UUID:
 class Thresholds:
     tier1_max: float
     tier2_max: float
+    auto_approve_enabled: bool = False
 
-    def as_dict(self) -> dict[str, float]:
-        return {"tier1_max": self.tier1_max, "tier2_max": self.tier2_max}
+    def as_dict(self) -> dict[str, float | bool]:
+        return {
+            "tier1_max": self.tier1_max,
+            "tier2_max": self.tier2_max,
+            "auto_approve_enabled": self.auto_approve_enabled,
+        }
+
+
+def get_auto_approve(tenant_id: UUID | str) -> bool:
+    """Return whether autonomous AI auto-approval is enabled for the tenant."""
+    tid = as_tenant_uuid(tenant_id)
+    with SessionLocal() as session:
+        tenant = session.get(Tenant, tid)
+        return bool(tenant.auto_approve_enabled) if tenant else False
+
+
+def set_auto_approve(tenant_id: UUID | str, enabled: bool) -> bool:
+    """Enable or disable autonomous AI auto-approval for the tenant."""
+    tid = as_tenant_uuid(tenant_id)
+    with SessionLocal() as session:
+        tenant = session.get(Tenant, tid)
+        if tenant is None:
+            tenant = Tenant(
+                id=tid,
+                name="Workspace",
+                invite_code=generate_invite_code(),
+                auto_approve_enabled=enabled,
+            )
+            session.add(tenant)
+        else:
+            tenant.auto_approve_enabled = enabled
+        session.commit()
+        return bool(tenant.auto_approve_enabled)
 
 
 def get_thresholds(tenant_id: UUID | str) -> Thresholds:
     """Return the tenant's persisted thresholds, creating the default row if absent."""
     tid = as_tenant_uuid(tenant_id)
     with SessionLocal() as session:
+        tenant = session.get(Tenant, tid)
+        auto_approve = bool(tenant.auto_approve_enabled) if tenant else False
         row = session.get(ApprovalThresholds, tid)
         if row is None:
-            if session.get(Tenant, tid) is None:
-                session.add(Tenant(id=tid, name="Workspace", invite_code=generate_invite_code()))
+            if tenant is None:
+                tenant = Tenant(id=tid, name="Workspace", invite_code=generate_invite_code())
+                session.add(tenant)
                 session.flush()
             row = ApprovalThresholds(
                 tenant_id=tid, tier1_max=DEFAULT_TIER1_MAX, tier2_max=DEFAULT_TIER2_MAX
             )
             session.add(row)
             session.commit()
-        return Thresholds(tier1_max=float(row.tier1_max), tier2_max=float(row.tier2_max))
+        return Thresholds(
+            tier1_max=float(row.tier1_max),
+            tier2_max=float(row.tier2_max),
+            auto_approve_enabled=auto_approve,
+        )
 
 
 def update_thresholds(
-    tenant_id: UUID | str, tier1_max: float, tier2_max: float, updated_by: str
+    tenant_id: UUID | str,
+    tier1_max: float,
+    tier2_max: float,
+    updated_by: str,
+    auto_approve_enabled: bool | None = None,
 ) -> Thresholds:
     if not 0 < tier1_max < tier2_max:
         raise ValueError("Thresholds must satisfy 0 < tier1_max < tier2_max")
     tid = as_tenant_uuid(tenant_id)
     with SessionLocal() as session:
+        tenant = session.get(Tenant, tid)
+        if tenant is None:
+            tenant = Tenant(id=tid, name="Workspace", invite_code=generate_invite_code())
+            session.add(tenant)
+            session.flush()
+        if auto_approve_enabled is not None:
+            tenant.auto_approve_enabled = auto_approve_enabled
         row = session.get(ApprovalThresholds, tid)
         if row is None:
-            if session.get(Tenant, tid) is None:
-                session.add(Tenant(id=tid, name="Workspace", invite_code=generate_invite_code()))
-                session.flush()
             row = ApprovalThresholds(tenant_id=tid)
             session.add(row)
         row.tier1_max = round(float(tier1_max), 2)
         row.tier2_max = round(float(tier2_max), 2)
         row.updated_by = updated_by
         session.commit()
-        return Thresholds(tier1_max=float(row.tier1_max), tier2_max=float(row.tier2_max))
+        return Thresholds(
+            tier1_max=float(row.tier1_max),
+            tier2_max=float(row.tier2_max),
+            auto_approve_enabled=bool(tenant.auto_approve_enabled),
+        )
 
 
 @dataclass(frozen=True)

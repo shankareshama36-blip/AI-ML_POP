@@ -9,6 +9,7 @@ from slowapi.errors import RateLimitExceeded
 
 from backend.app.api.auth_api import router as auth_router
 from backend.app.api.complaints_api import router as complaints_router
+from backend.app.api.explorer_api import router as explorer_router
 from backend.app.api.settings_api import router as settings_router
 from backend.app.auth_real import get_current_user
 from backend.app.core.rate_limit import (
@@ -75,6 +76,7 @@ async def cache_request_body_middleware(request: Request, call_next):
 app.include_router(auth_router)
 app.include_router(complaints_router)
 app.include_router(settings_router)
+app.include_router(explorer_router)
 
 decision_repository = DecisionRepository()
 

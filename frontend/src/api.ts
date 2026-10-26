@@ -285,10 +285,20 @@ async function request<T>(path: string, options: RequestInit = {}, timeoutMs = 6
   throw lastError;
 }
 
+export type UserRole =
+  | "explorer"
+  | "creator"
+  | "researcher"
+  | "business_owner"
+  | "technician"
+  | "maintenance_supervisor"
+  | "production_supervisor"
+  | "plant_manager";
+
 export async function signup(
   email: string,
   password: string,
-  role: "technician" | "maintenance_supervisor" | "production_supervisor" | "plant_manager" = "technician",
+  role: UserRole = "technician",
   company_name?: string,
   invite_code?: string,
 ): Promise<AuthResult> {
@@ -323,6 +333,17 @@ export async function login(email: string, password: string, isDemo = false): Pr
   return request<AuthResult>(`/auth/login${query}`, {
     method: "POST",
     body: JSON.stringify({ email: email.trim(), password }),
+  });
+}
+
+export async function socialLogin(
+  provider: string,
+  email: string,
+  name?: string
+): Promise<AuthResult> {
+  return request<AuthResult>("/auth/social-login", {
+    method: "POST",
+    body: JSON.stringify({ provider, email, name }),
   });
 }
 
@@ -508,6 +529,7 @@ export async function getDecisionsCount(): Promise<number> {
 export interface Thresholds {
   tier1_max: number;
   tier2_max: number;
+  auto_approve_enabled?: boolean;
 }
 
 export interface WorkspaceMember {
@@ -527,10 +549,21 @@ export async function getThresholds(): Promise<Thresholds> {
   return request<Thresholds>("/settings/thresholds", { method: "GET" });
 }
 
-export async function updateThresholds(tier1_max: number, tier2_max: number): Promise<Thresholds> {
+export async function updateThresholds(
+  tier1_max: number,
+  tier2_max: number,
+  auto_approve_enabled?: boolean
+): Promise<Thresholds> {
   return request<Thresholds>("/settings/thresholds", {
     method: "PUT",
-    body: JSON.stringify({ tier1_max, tier2_max }),
+    body: JSON.stringify({ tier1_max, tier2_max, auto_approve_enabled }),
+  });
+}
+
+export async function toggleAutoApprove(enabled: boolean): Promise<Thresholds> {
+  return request<Thresholds>("/settings/auto-approve", {
+    method: "PUT",
+    body: JSON.stringify({ enabled }),
   });
 }
 
@@ -541,3 +574,59 @@ export async function getWorkspace(): Promise<Workspace> {
 export async function rotateInviteCode(): Promise<Workspace> {
   return request<Workspace>("/settings/workspace/invite-code", { method: "POST" });
 }
+
+export interface ExplorerAnalysisResult {
+  analysis: string;
+  text: string;
+  recommended_option?: string;
+  model_used: string;
+}
+
+export async function analyzeExplorerDecision(
+  title: string,
+  options: string[],
+  constraints: string
+): Promise<ExplorerAnalysisResult> {
+  return request<ExplorerAnalysisResult>("/explorer/analyze", {
+    method: "POST",
+    body: JSON.stringify({ title, options, constraints }),
+  });
+}
+
+export interface ChatMessageInput {
+  role: "user" | "assistant" | "system";
+  content: string;
+}
+
+export interface ExplorerChatResult {
+  reply: string;
+  model_used: string;
+}
+
+export interface ChatContextDetails {
+  title?: string;
+  options?: string[];
+  constraints?: string;
+  recommended_option?: string;
+}
+
+export async function chatWithExplorer(
+  messages: ChatMessageInput[],
+  decision_context?: string,
+  details?: ChatContextDetails
+): Promise<ExplorerChatResult> {
+  return request<ExplorerChatResult>("/explorer/chat", {
+    method: "POST",
+    body: JSON.stringify({
+      messages,
+      decision_context,
+      title: details?.title,
+      options: details?.options,
+      constraints: details?.constraints,
+      recommended_option: details?.recommended_option,
+    }),
+  });
+}
+
+
+

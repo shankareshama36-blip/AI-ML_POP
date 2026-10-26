@@ -56,6 +56,18 @@ engine = create_engine(
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
+ALLOWED_ROLES = (
+    "explorer",
+    "creator",
+    "researcher",
+    "business_owner",
+    "technician",
+    "maintenance_supervisor",
+    "production_supervisor",
+    "plant_manager",
+)
+
+
 class Base(DeclarativeBase):
     pass
 
@@ -69,6 +81,9 @@ class Tenant(Base):
     name: Mapped[str] = mapped_column(String(120))
     # Secret, rotatable code an admin shares so colleagues can join the workspace.
     invite_code: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    auto_approve_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false()
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
@@ -255,7 +270,7 @@ def _upgrade_legacy_schema() -> None:
     """
     with engine.begin() as connection:
         inspector = inspect(connection)
-        for table in (User.__table__, ComplaintWorkflow.__table__):
+        for table in (Tenant.__table__, User.__table__, ComplaintWorkflow.__table__):
             if not inspector.has_table(table.name):
                 continue
             existing = {column["name"] for column in inspector.get_columns(table.name)}

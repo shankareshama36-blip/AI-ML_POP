@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, useCallback, type ReactNode } from "react";
+import { useState, useEffect, useRef, createContext, useContext, useCallback, type ReactNode } from "react";
 import { IconCheck, IconX, IconAlert } from "./Icons";
 
 export type ToastType = "error" | "success" | "info" | "warning";
@@ -7,6 +7,7 @@ export interface ToastItem {
   id: string;
   message: string;
   type: ToastType;
+  leaving?: boolean;
 }
 
 interface ToastContextValue {
@@ -94,18 +95,59 @@ function cleanErrorString(raw: string): string {
   return raw;
 }
 
+/** How long a toast stays fully visible before it starts fading out. */
+const TOAST_DURATION_MS = 5000;
+/** Duration of the fade-out animation (must match `.toast-leaving` in App.css). */
+const TOAST_FADE_MS = 300;
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  // Timers are owned by the provider (keyed by toast id) so that re-renders of
+  // the provider or its children can never reset or clear them prematurely.
+  const timers = useRef<Map<string, ReturnType<typeof setTimeout>[]>>(new Map());
 
-  const removeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
+  const clearTimers = useCallback((id: string) => {
+    const pending = timers.current.get(id);
+    if (pending) {
+      pending.forEach(clearTimeout);
+      timers.current.delete(id);
+    }
   }, []);
 
-  const showToast = useCallback((message: string, type: ToastType = "error") => {
-    const cleanMsg = cleanErrorString(message);
-    const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    setToasts((prev) => [...prev.slice(-3), { id, message: cleanMsg, type }]);
-  }, []);
+  const removeToast = useCallback(
+    (id: string) => {
+      clearTimers(id);
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    },
+    [clearTimers],
+  );
+
+  // Start the fade-out, then unmount once the animation has finished.
+  const dismissToast = useCallback(
+    (id: string) => {
+      clearTimers(id);
+      setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, leaving: true } : t)));
+      const removal = setTimeout(() => removeToast(id), TOAST_FADE_MS);
+      timers.current.set(id, [removal]);
+    },
+    [clearTimers, removeToast],
+  );
+
+  const showToast = useCallback(
+    (message: string, type: ToastType = "error") => {
+      const cleanMsg = cleanErrorString(message);
+      const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      setToasts((prev) => {
+        const next = [...prev, { id, message: cleanMsg, type }];
+        // Drop the oldest toasts beyond the cap (and their timers).
+        const overflow = next.slice(0, Math.max(0, next.length - 4));
+        overflow.forEach((t) => clearTimers(t.id));
+        return next.slice(-4);
+      });
+      timers.current.set(id, [setTimeout(() => dismissToast(id), TOAST_DURATION_MS)]);
+    },
+    [clearTimers, dismissToast],
+  );
 
   useEffect(() => {
     globalShowToast = showToast;
@@ -114,12 +156,20 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     };
   }, [showToast]);
 
+  useEffect(() => {
+    const map = timers.current;
+    return () => {
+      map.forEach((list) => list.forEach(clearTimeout));
+      map.clear();
+    };
+  }, []);
+
   return (
     <ToastContext.Provider value={{ showToast, removeToast }}>
       {children}
       <div className="toast-portal" aria-live="polite" role="region" aria-label="Notifications">
         {toasts.map((toast) => (
-          <ToastCard key={toast.id} toast={toast} onDismiss={() => removeToast(toast.id)} />
+          <ToastCard key={toast.id} toast={toast} onDismiss={() => dismissToast(toast.id)} />
         ))}
       </div>
     </ToastContext.Provider>
@@ -127,15 +177,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 }
 
 function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => void }) {
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      onDismiss();
-    }, 4500);
-    return () => clearTimeout(timer);
-  }, [onDismiss]);
-
   return (
-    <div className={`toast-card toast-${toast.type} animate-toast-slide`} role="alert">
+    <div
+      className={`toast-card toast-${toast.type} animate-toast-slide${toast.leaving ? " toast-leaving" : ""}`}
+      role="alert"
+    >
       <div className="toast-icon">
         {toast.type === "success" && <IconCheck size={16} />}
         {toast.type === "error" && <IconAlert size={16} />}

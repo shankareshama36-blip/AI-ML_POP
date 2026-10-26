@@ -1,8 +1,12 @@
-import type { ReactNode } from "react";
+import { type ReactNode } from "react";
 import { Logo } from "./Logo";
 import { IconArrowRight } from "./Icons";
 
-export type PublicView = "landing" | "about" | "contact" | "legal" | "pricing" | "login" | "signup";
+export type PublicView = "landing" | "about" | "contact" | "legal" | "pricing" | "customize" | "login" | "signup";
+
+/** localStorage key + window event used to deep-link into a LegalPage tab. */
+export const LEGAL_TAB_KEY = "praxis-legal-tab";
+export const LEGAL_TAB_EVENT = "praxis-legal-tab";
 
 interface LandingLayoutProps {
   children: ReactNode;
@@ -17,7 +21,6 @@ export function LandingLayout({
   onNavigate,
   onSignIn,
   onGetStarted,
-  currentView = "landing",
 }: LandingLayoutProps) {
   function handleLogoClick() {
     onNavigate("landing");
@@ -37,9 +40,22 @@ export function LandingLayout({
     }
   }
 
+  /** Open the legal page directly on the requested document tab. */
+  function handleLegalLink(tab: "terms" | "privacy") {
+    try {
+      localStorage.setItem(LEGAL_TAB_KEY, tab);
+    } catch {
+      // Storage unavailable
+    }
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(LEGAL_TAB_EVENT, { detail: tab }));
+    }
+    handleNavLink("legal");
+  }
+
   return (
     <div className="landing-layout-wrapper animate-fade">
-      {/* Top Navbar */}
+      {/* Top Navbar: Logo left, Sign In + Get Started right */}
       <nav className="landing-nav" aria-label="Primary navigation">
         <button
           type="button"
@@ -50,54 +66,12 @@ export function LandingLayout({
           <Logo />
         </button>
 
-        <div className="landing-nav-links" role="menubar">
-          <button
-            type="button"
-            className={`nav-link ${currentView === "landing" ? "active" : ""}`}
-            onClick={() => handleNavLink("landing")}
-            role="menuitem"
-          >
-            Platform
-          </button>
-          <button
-            type="button"
-            className={`nav-link ${currentView === "pricing" ? "active" : ""}`}
-            onClick={() => handleNavLink("pricing")}
-            role="menuitem"
-          >
-            Pricing
-          </button>
-          <button
-            type="button"
-            className={`nav-link ${currentView === "about" ? "active" : ""}`}
-            onClick={() => handleNavLink("about")}
-            role="menuitem"
-          >
-            Why Trust Praxis
-          </button>
-          <button
-            type="button"
-            className={`nav-link ${currentView === "contact" ? "active" : ""}`}
-            onClick={() => handleNavLink("contact")}
-            role="menuitem"
-          >
-            Contact
-          </button>
-          <button
-            type="button"
-            className={`nav-link ${currentView === "legal" ? "active" : ""}`}
-            onClick={() => handleNavLink("legal")}
-            role="menuitem"
-          >
-            Legal
-          </button>
-        </div>
-
+        {/* Actions: Sign In (ghost) & Get Started (primary) */}
         <div className="landing-nav-actions">
-          <button type="button" className="nav-signin" onClick={onSignIn}>
-            Sign in
+          <button type="button" className="btn-ghost nav-signin" onClick={onSignIn}>
+            Sign In
           </button>
-          <button type="button" className="landing-nav-btn" onClick={onGetStarted}>
+          <button type="button" className="btn-primary landing-nav-btn" onClick={onGetStarted}>
             Get Started Free <IconArrowRight size={14} />
           </button>
         </div>
@@ -106,7 +80,7 @@ export function LandingLayout({
       {/* Main Content Area */}
       <main className="landing-layout-content">{children}</main>
 
-      {/* Enterprise SaaS Footer */}
+      {/* Footer */}
       <footer className="landing-footer" aria-label="Footer navigation">
         <div className="footer-grid">
           <div className="footer-brand">
@@ -128,35 +102,14 @@ export function LandingLayout({
               className="footer-link-btn"
               onClick={() => handleNavLink("landing", "features")}
             >
-              Capabilities
+              Features
             </button>
             <button
               type="button"
               className="footer-link-btn"
-              onClick={() => handleNavLink("landing", "how")}
+              onClick={() => handleNavLink("customize")}
             >
-              Decision Loop
-            </button>
-            <button
-              type="button"
-              className="footer-link-btn"
-              onClick={() => handleNavLink("landing", "team")}
-            >
-              Role Hierarchies
-            </button>
-            <button
-              type="button"
-              className="footer-link-btn"
-              onClick={() => handleNavLink("about")}
-            >
-              DFA Guardrails
-            </button>
-            <button
-              type="button"
-              className="footer-link-btn"
-              onClick={() => handleNavLink("pricing")}
-            >
-              Plans & Pricing
+              Pricing
             </button>
           </div>
 
@@ -167,100 +120,36 @@ export function LandingLayout({
               className="footer-link-btn"
               onClick={() => handleNavLink("about")}
             >
-              About Praxis
+              About
             </button>
             <button
               type="button"
               className="footer-link-btn"
               onClick={() => handleNavLink("contact")}
             >
-              Get in Touch
-            </button>
-            <button
-              type="button"
-              className="footer-link-btn"
-              onClick={() => handleNavLink("about")}
-            >
-              Trust & Security
-            </button>
-            <button
-              type="button"
-              className="footer-link-btn"
-              onClick={() => handleNavLink("legal")}
-            >
-              Compliance Overview
+              Contact
             </button>
           </div>
 
           <div>
-            <h3>Legal & Trust</h3>
+            <h3>Legal</h3>
             <button
               type="button"
               className="footer-link-btn"
-              onClick={() => handleNavLink("legal")}
-            >
-              Terms of Service
-            </button>
-            <button
-              type="button"
-              className="footer-link-btn"
-              onClick={() => handleNavLink("legal")}
+              onClick={() => handleLegalLink("privacy")}
             >
               Privacy Policy
             </button>
             <button
               type="button"
               className="footer-link-btn"
-              onClick={() => handleNavLink("legal")}
+              onClick={() => handleLegalLink("terms")}
             >
-              Data Processing (DPA)
-            </button>
-            <button
-              type="button"
-              className="footer-link-btn"
-              onClick={() => handleNavLink("legal")}
-            >
-              Service Level Agreement (SLA)
+              Terms of Service
             </button>
           </div>
         </div>
 
-        {/* Exact required Footer bar: Company | About | Contact | Legal */}
-        <div className="footer-links-bar" aria-label="Quick links">
-          <button
-            type="button"
-            className="footer-link-text"
-            onClick={() => handleNavLink("about")}
-          >
-            Company
-          </button>
-          <span className="footer-sep" aria-hidden="true">|</span>
-          <button
-            type="button"
-            className="footer-link-text"
-            onClick={() => handleNavLink("about")}
-          >
-            About
-          </button>
-          <span className="footer-sep" aria-hidden="true">|</span>
-          <button
-            type="button"
-            className="footer-link-text"
-            onClick={() => handleNavLink("contact")}
-          >
-            Contact
-          </button>
-          <span className="footer-sep" aria-hidden="true">|</span>
-          <button
-            type="button"
-            className="footer-link-text"
-            onClick={() => handleNavLink("legal")}
-          >
-            Legal
-          </button>
-        </div>
-
-        {/* Exact required Footer bottom text */}
         <div className="footer-bottom">
           <span>© 2026 Praxis Platform. All rights reserved.</span>
           <span>Built for accountable operations.</span>

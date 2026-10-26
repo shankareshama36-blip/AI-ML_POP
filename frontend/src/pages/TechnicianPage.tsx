@@ -9,7 +9,6 @@ import {
 import {
   IconPlus,
   IconList,
-  IconClipboard,
   IconCheck,
   IconX,
   IconClock,
@@ -207,6 +206,7 @@ export function TechnicianPage({ user, onLogout, onOpenSettings }: TechnicianPag
       </header>
 
       {/* Main Page Area */}
+      {/* Main Page Area: 70% data table, 30% report form */}
       <main className="page-main">
         <div className="page-header">
           <h1 className="page-title">Technician Dashboard</h1>
@@ -215,207 +215,207 @@ export function TechnicianPage({ user, onLogout, onOpenSettings }: TechnicianPag
           </p>
         </div>
 
-        {/* Section 1: Report New Complaint Card */}
-        <div className="card">
-          <div className="card-header">
-            <div className="card-title">
-              <IconPlus size={18} /> Report New Complaint
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmit} className="form-grid">
-            <div className="form-field">
-              <label className="form-label">Machine ID</label>
-              <select
-                className="form-select"
-                value={selectedMachine}
-                onChange={(e) => setSelectedMachine(e.target.value)}
+        <div className="dashboard-grid technician-grid">
+          {/* Main Content (70%): Complaints Data Table */}
+          <div className="card dashboard-data-card">
+            <div className="card-header">
+              <div className="card-title">
+                <IconList size={18} /> My Complaints{" "}
+                <span className="status-badge pending">{complaints.length}</span>
+              </div>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={fetchComplaints}
+                disabled={loadingList}
+                aria-label="Refresh complaints list"
               >
-                {MACHINE_OPTIONS.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-              {selectedMachine === "Other" && (
-                <input
-                  type="text"
-                  className="form-input animate-slide-up"
-                  placeholder="Enter Machine ID (e.g. M-999)"
-                  value={customMachine}
-                  onChange={(e) => setCustomMachine(e.target.value)}
-                  style={{ marginTop: "8px" }}
-                  required
-                />
-              )}
-            </div>
-
-            <div className="form-field">
-              <label className="form-label">Problem Type</label>
-              <select
-                className="form-select"
-                value={selectedProblem}
-                onChange={(e) => setSelectedProblem(e.target.value)}
-              >
-                {PROBLEM_OPTIONS.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-              {selectedProblem === "Other" && (
-                <input
-                  type="text"
-                  className="form-input animate-slide-up"
-                  placeholder="Enter custom problem description"
-                  value={customProblem}
-                  onChange={(e) => setCustomProblem(e.target.value)}
-                  style={{ marginTop: "8px" }}
-                  required
-                />
-              )}
-            </div>
-
-            <div className="form-field">
-              <label className="form-label">Severity Level</label>
-              <select
-                className="form-select"
-                value={severity}
-                onChange={(e) => setSeverity(e.target.value)}
-              >
-                {SEVERITY_OPTIONS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-field full">
-              <label className="form-label">Operational Notes / Symptoms</label>
-              <textarea
-                className="form-textarea"
-                rows={3}
-                placeholder="Describe machine behavior, abnormal telemetry, unusual noises, or symptoms..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
-            </div>
-
-            <div className="form-field full">
-              <button type="submit" className="btn-primary" disabled={submitting}>
-                {submitting ? (
-                  <>
-                    <IconSpinner size={16} /> Submitting Complaint…
-                  </>
-                ) : (
-                  <>
-                    <IconPlus size={16} /> Submit Complaint
-                  </>
-                )}
+                {loadingList ? "Refreshing…" : "↻ Refresh"}
               </button>
             </div>
-          </form>
-        </div>
 
-        {/* Section 2: Complaints List Card */}
-        <div className="card">
-          <div className="card-header">
-            <div className="card-title">
-              <IconList size={18} /> My Complaints{" "}
-              <span className="status-badge pending">{complaints.length}</span>
-            </div>
-            <button
-              type="button"
-              className="btn-ghost"
-              onClick={fetchComplaints}
-              disabled={loadingList}
-              aria-label="Refresh complaints list"
-            >
-              {loadingList ? "Refreshing…" : "↻ Refresh"}
-            </button>
+            {loadingList && complaints.length === 0 ? (
+              <div className="skeleton-list">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="skeleton-card">
+                    <div className="skeleton-line" style={{ width: "25%", height: "12px", marginBottom: "8px" }} />
+                    <div className="skeleton-line" style={{ width: "65%", height: "16px", marginBottom: "8px" }} />
+                    <div className="skeleton-line" style={{ width: "40%", height: "12px" }} />
+                  </div>
+                ))}
+              </div>
+            ) : complaints.length === 0 ? (
+              <div className="empty-state empty-state-card animate-fade">
+                <div className="empty-state-icon-wrap success">
+                  <IconCheck size={32} />
+                </div>
+                <h4 className="empty-state-title">No pending complaints. All clear!</h4>
+                <p className="empty-state-subtitle">Submit a machine issue from the panel to initiate an automated evaluation.</p>
+              </div>
+            ) : (
+              <div className="table-responsive">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Machine &amp; Issue</th>
+                      <th>Severity</th>
+                      <th>AI Decision</th>
+                      <th>Status</th>
+                      <th>Submitted</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {complaints.map((item) => (
+                      <tr key={item.complaint_id} className="data-table-row">
+                        <td>
+                          <div className="table-cell-title">
+                            {item.machine_id} — {item.problem_type}
+                          </div>
+                          <div className="table-cell-sub">
+                            #{item.complaint_id.slice(0, 8)}
+                            {item.notes ? ` · ${item.notes}` : ""}
+                          </div>
+                        </td>
+                        <td>
+                          <span className="severity-badge" data-sev={item.severity}>
+                            {item.severity}
+                          </span>
+                        </td>
+                        <td>
+                          {item.decision ? (
+                            <div className="decision-cell-inline">
+                              <span className="decision-action-tag">
+                                {item.decision.recommended_action_id}
+                              </span>
+                              <span className="decision-cost-tag">
+                                ₹{Number(item.decision.expected_cost || 0).toLocaleString()}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-muted" style={{ fontSize: "12px" }}>Awaiting AI</span>
+                          )}
+                        </td>
+                        <td>
+                          <StatusBadge status={item.status} />
+                        </td>
+                        <td className="text-muted" style={{ fontSize: "12px", whiteSpace: "nowrap" }}>
+                          {new Date(item.submitted_at).toLocaleDateString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
-          {loadingList && complaints.length === 0 ? (
-            <div className="skeleton-list">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="skeleton-card">
-                  <div className="skeleton-line" style={{ width: "25%", height: "12px", marginBottom: "8px" }} />
-                  <div className="skeleton-line" style={{ width: "65%", height: "16px", marginBottom: "8px" }} />
-                  <div className="skeleton-line" style={{ width: "40%", height: "12px" }} />
-                </div>
-              ))}
-            </div>
-          ) : complaints.length === 0 ? (
-            <div className="empty-state empty-state-card animate-fade">
-              <div className="empty-state-icon-wrap">
-                <IconClipboard size={32} />
+          {/* Details / Action Sidebar (30%): Report New Issue */}
+          <div className="card dashboard-sidebar-card">
+            <div className="card-header">
+              <div className="card-title">
+                <IconPlus size={18} /> Report Machine Issue
               </div>
-              <h4 className="empty-state-title">No complaints filed yet.</h4>
-              <p className="empty-state-subtitle">Submit your first complaint above to initiate an automated evaluation.</p>
             </div>
-          ) : (
-            <div className="complaint-list">
-              {complaints.map((item) => (
-                <div
-                  key={item.complaint_id}
-                  className="complaint-item"
-                  data-status={item.status}
+
+            <form onSubmit={handleSubmit} className="form-grid">
+              <div className="form-field full">
+                <label className="form-label">Machine ID</label>
+                <select
+                  className="form-select"
+                  value={selectedMachine}
+                  onChange={(e) => setSelectedMachine(e.target.value)}
                 >
-                  <div>
-                    <div className="complaint-id">#{item.complaint_id.slice(0, 8)}</div>
-                    <div className="complaint-title">
-                      {item.machine_id} — {item.problem_type}
-                    </div>
-                    {item.notes && <div className="complaint-meta">{item.notes}</div>}
-                    <div className="complaint-meta">
-                      Submitted: {new Date(item.submitted_at).toLocaleString()}
-                    </div>
+                  {MACHINE_OPTIONS.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+                {selectedMachine === "Other" && (
+                  <input
+                    type="text"
+                    className="form-input animate-slide-up"
+                    placeholder="Enter Machine ID (e.g. M-999)"
+                    value={customMachine}
+                    onChange={(e) => setCustomMachine(e.target.value)}
+                    style={{ marginTop: "8px" }}
+                    required
+                  />
+                )}
+              </div>
 
-                    {item.decision && (
-                      <div className="complaint-decision-mini">
-                        <strong>AI Recommendation:</strong> Action{" "}
-                        <code>{item.decision.recommended_action_id}</code> | Est. Cost: ₹
-                        {Number(item.decision.expected_cost || 0).toLocaleString()} | Downtime:{" "}
-                        {item.decision.expected_downtime}h | Risk:{" "}
-                        {item.decision.expected_risk}
-                      </div>
-                    )}
+              <div className="form-field full">
+                <label className="form-label">Problem Type</label>
+                <select
+                  className="form-select"
+                  value={selectedProblem}
+                  onChange={(e) => setSelectedProblem(e.target.value)}
+                >
+                  {PROBLEM_OPTIONS.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+                {selectedProblem === "Other" && (
+                  <input
+                    type="text"
+                    className="form-input animate-slide-up"
+                    placeholder="Enter custom problem description"
+                    value={customProblem}
+                    onChange={(e) => setCustomProblem(e.target.value)}
+                    style={{ marginTop: "8px" }}
+                    required
+                  />
+                )}
+              </div>
 
-                    {item.approvals && item.approvals.length > 0 && (
-                      <div className="approval-history-mini">
-                        <strong>Approval Log:</strong>
-                        <ul>
-                          {item.approvals.map((appr, idx) => (
-                            <li key={idx}>
-                              <span
-                                className={
-                                  appr.action === "APPROVED"
-                                    ? "text-success"
-                                    : "text-danger"
-                                }
-                              >
-                                {appr.action}
-                              </span>{" "}
-                              by <code>{appr.username}</code> ({appr.role})
-                              {appr.comment ? ` — "${appr.comment}"` : ""}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
+              <div className="form-field full">
+                <label className="form-label">Severity Level</label>
+                <select
+                  className="form-select"
+                  value={severity}
+                  onChange={(e) => setSeverity(e.target.value)}
+                >
+                  {SEVERITY_OPTIONS.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-                  <div className="badge-row">
-                    <span className="severity-badge" data-sev={item.severity}>
-                      {item.severity}
-                    </span>
-                    <StatusBadge status={item.status} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+              <div className="form-field full">
+                <label className="form-label">Operational Notes / Symptoms</label>
+                <textarea
+                  className="form-textarea"
+                  rows={3}
+                  placeholder="Abnormal telemetry, vibration, noises, symptoms..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+              </div>
+
+              <div className="form-field full">
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  style={{ width: "100%", justifyContent: "center" }}
+                  disabled={submitting}
+                >
+                  {submitting ? (
+                    <>
+                      <IconSpinner size={16} /> Submitting Issue…
+                    </>
+                  ) : (
+                    <>
+                      <IconPlus size={16} /> Submit Issue
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       </main>
     </div>

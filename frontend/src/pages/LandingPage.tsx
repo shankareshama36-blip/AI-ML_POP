@@ -58,29 +58,56 @@ export function LandingPage({ onSignIn: _onSignIn, onGetStarted }: LandingPagePr
   return (
     <div className="landing-page animate-fade">
 
-      <header id="top" className="hero hero-premium">
-        <div className="hero-inner">
-          <div className="hero-copy">
-            <div className="hero-badge">Decision intelligence for operations</div>
-            <h1 className="hero-title">AI can act. <span>Praxis decides.</span></h1>
-            <p className="hero-subtitle">Praxis validates conditions, models trade-offs, and routes the safest feasible action to the right decision-maker.</p>
-            <div className="hero-actions">
-              <button type="button" className="btn-primary btn-lg" onClick={onGetStarted}>Explore the platform <IconArrowRight size={16} /></button>
-              <button type="button" className="btn-ghost btn-lg" onClick={() => scrollTo("how")}>See the decision loop</button>
+      <header id="top" className="hero hero-premium hero-centered">
+        <div className="hero-orbs" aria-hidden="true">
+          <span className="hero-orb hero-orb-1" />
+          <span className="hero-orb hero-orb-2" />
+          <span className="hero-orb hero-orb-3" />
+          <span className="hero-ring" />
+        </div>
+        <div className="hero-inner hero-inner-centered">
+          <div className="hero-copy hero-copy-centered">
+            <div className="hero-badge fade-in-up">Autonomous &amp; Accountable Operations</div>
+            <h1 className="hero-title fade-in-up delay-1">
+              Make the Best Decision, <span className="hero-title-gradient">Every Time</span>
+            </h1>
+            <p className="hero-subtitle fade-in-up delay-2">
+              Deterministic DFA state verification, multi-objective Dijkstra graph optimization,
+              and predictive AI models unified into one accountable decision engine.
+            </p>
+            <div className="hero-actions fade-in-up delay-3">
+              <button
+                type="button"
+                className="btn-primary btn-lg hero-cta hero-cta-float"
+                onClick={onGetStarted}
+              >
+                Get Started Free <IconArrowRight size={16} />
+              </button>
+              <button
+                type="button"
+                className="btn-ghost btn-lg hero-cta hero-cta-float hero-cta-delay"
+                onClick={() => scrollTo("how")}
+              >
+                See How It Works
+              </button>
             </div>
-            <div className="hero-proof" aria-label="Platform capabilities">
-              <span><IconCheckCircle size={14} /> Formal validation</span>
-              <span><IconTrending size={14} /> ML predictions</span>
-              <span><IconClipboard size={14} /> Human approval</span>
+            <div className="hero-trust fade-in-up delay-4" aria-label="Platform trust signals">
+              <span className="hero-trust-item"><IconCheckCircle size={15} /> DFA Verified</span>
+              <span className="hero-trust-item"><IconLayers size={15} /> Dijkstra Optimized</span>
+              <span className="hero-trust-item"><IconCpu size={15} /> AI-Powered</span>
             </div>
           </div>
 
-          <div className="decision-showcase" aria-label="Example Praxis decision">
+          {/* Stylized CSS-Only Product Mockup Card */}
+          <div className="decision-showcase decision-showcase-centered fade-in-up delay-4" aria-label="Example Praxis decision card">
             <div className="floating-card floating-valid"><IconCheckCircle size={14} /> DFA valid</div>
             <div className="floating-card floating-constraints"><IconShield size={14} /> 3 constraints satisfied</div>
-            <article className="decision-panel">
+            <article className="decision-panel decision-panel-glow">
               <div className="decision-panel-top">
-                <div><p className="panel-kicker">Live decision brief</p><h2>CNC-07</h2></div>
+                <div>
+                  <p className="panel-kicker">Live Decision Brief</p>
+                  <h2>CNC-07 Multi-Axis Mill</h2>
+                </div>
                 <span className="attention-badge"><i /> Attention required</span>
               </div>
               <div className="decision-metrics">

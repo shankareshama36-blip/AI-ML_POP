@@ -28,6 +28,8 @@ from backend.app.models import MachineState, MachineStatus, OperationalConstrain
 
 router = APIRouter(prefix="/complaints", tags=["complaints"])
 _APPROVER_ROLES = {"maintenance_supervisor", "production_supervisor", "plant_manager"}
+_SUBMITTER_ROLES = {"technician", "explorer", "creator", "researcher", "business_owner"}
+_EVALUATOR_ROLES = {"maintenance_supervisor", "business_owner", "plant_manager"}
 CurrentUser = Annotated[dict[str, object], Depends(get_current_user)]
 
 
@@ -62,7 +64,7 @@ class ActionBody(BaseModel):
 @router.post("", response_model=ComplaintRecord, status_code=status.HTTP_201_CREATED)
 @limiter.limit("20/minute")
 def submit_complaint(request: Request, payload: ComplaintCreate, current_user: CurrentUser) -> ComplaintRecord:
-    _require_role(current_user, {"technician"})
+    _require_role(current_user, _SUBMITTER_ROLES)
     return create_complaint(
         payload, submitted_by=str(current_user["email"]), tenant_id=_tenant(current_user)
     )
@@ -71,17 +73,19 @@ def submit_complaint(request: Request, payload: ComplaintCreate, current_user: C
 @router.get("", response_model=list[ComplaintRecord])
 def get_complaints(current_user: CurrentUser) -> list[ComplaintRecord]:
     role = str(current_user["role"])
-    if role == "technician":
+    if role in {"technician", "explorer", "creator", "researcher"}:
         return list_complaints(tenant_id=_tenant(current_user), submitted_by=str(current_user["email"]))
+    if role == "business_owner":
+        return list_complaints(tenant_id=_tenant(current_user))
     _require_role(current_user, _APPROVER_ROLES)
     return list_complaints_for_role(role, tenant_id=_tenant(current_user))
 
 
 @router.get("/{complaint_id}", response_model=ComplaintRecord)
 def get_one_complaint(complaint_id: UUID, current_user: CurrentUser) -> ComplaintRecord:
-    _require_role(current_user, _APPROVER_ROLES | {"technician"})
+    _require_role(current_user, _APPROVER_ROLES | _SUBMITTER_ROLES)
     record = _get_or_404(complaint_id, current_user)
-    if current_user["role"] == "technician" and record.submitted_by != current_user["email"]:
+    if current_user["role"] in {"technician", "explorer", "creator", "researcher"} and record.submitted_by != current_user["email"]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Complaint is not yours.")
     return record
 
@@ -89,7 +93,7 @@ def get_one_complaint(complaint_id: UUID, current_user: CurrentUser) -> Complain
 @router.post("/{complaint_id}/evaluate", response_model=ComplaintRecord)
 @limiter.limit("20/minute")
 def evaluate_complaint(request: Request, complaint_id: UUID, current_user: CurrentUser) -> ComplaintRecord:
-    _require_role(current_user, {"maintenance_supervisor"})
+    _require_role(current_user, _EVALUATOR_ROLES)
     record = _get_or_404(complaint_id, current_user)
     maintenance_request = MaintenanceRequest(machine_id=record.machine_id, maintenance_type="CORRECTIVE", priority="HIGH" if record.severity in ("HIGH", "CRITICAL") else "MEDIUM", condition=record.severity if record.severity in ("NORMAL", "WARN", "ALERT", "CRITICAL") else "WARN", action="REPAIR")
     machine_state = MachineState(temperature_c=85.0, vibration_mm_s=5.0, operating_hours=500, status=MachineStatus.DEGRADED)

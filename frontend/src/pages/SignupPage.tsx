@@ -1,7 +1,8 @@
 import { useMemo, useState, type FormEvent } from "react";
-import { ApiError, signup, type User } from "../api";
-import { IconAlert, IconCheckCircle, IconSpinner } from "../components/Icons";
+import { ApiError, signup, type User, type UserRole } from "../api";
+import { IconAlert, IconCheckCircle, IconShield, IconSpinner } from "../components/Icons";
 import { Logo } from "../components/Logo";
+import { SocialLoginButtons } from "../components/SocialLoginButtons";
 
 interface SignupPageProps {
   onSignup: (user: User, token: string) => void;
@@ -36,11 +37,13 @@ function evaluatePassword(password: string) {
 }
 
 export function SignupPage({ onSignup, onSignIn }: SignupPageProps) {
+  const [hasPaid, setHasPaid] = useState(false);
   const [companyName, setCompanyName] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [role] = useState<"technician">("technician");
+  const [role, setRole] = useState<UserRole>("technician");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,8 +53,8 @@ export function SignupPage({ onSignup, onSignIn }: SignupPageProps) {
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError(null);
-    if (!companyName.trim() || companyName.trim().length < 2) {
-      return setError("Enter your company or organization name (at least 2 characters).");
+    if (!inviteCode.trim() && (!companyName.trim() || companyName.trim().length < 2)) {
+      return setError("Enter your company or organization name (at least 2 characters) or provide an invite code.");
     }
     if (!/^\S+@\S+\.\S+$/.test(email)) {
       return setError("Enter a valid email address.");
@@ -65,7 +68,13 @@ export function SignupPage({ onSignup, onSignIn }: SignupPageProps) {
 
     setLoading(true);
     try {
-      const result = await signup(email.trim(), password, role, companyName.trim());
+      const result = await signup(
+        email.trim(),
+        password,
+        role,
+        companyName.trim() || undefined,
+        inviteCode.trim() || undefined
+      );
       setSuccess(true);
       setTimeout(() => {
         onSignup(result.user, result.token);
@@ -106,11 +115,80 @@ export function SignupPage({ onSignup, onSignIn }: SignupPageProps) {
     );
   }
 
+  if (!hasPaid) {
+    return (
+      <div className="login-page animate-fade">
+        <div className="login-card paywall-card animate-scale">
+          <div className="login-logo"><Logo /></div>
+
+          <div className="paywall-badge">
+            <IconShield size={14} /> Professional Workspace Tier
+          </div>
+
+          <h2 className="paywall-title">Activate your Workspace</h2>
+
+          <p className="paywall-subtitle text-muted">
+            To create a new company workspace on Praxis, please subscribe to the Professional plan.
+          </p>
+
+          <div className="paywall-price-badge">
+            <span className="paywall-price-amount">₹4,999</span>
+            <span className="paywall-price-period"> / month</span>
+          </div>
+
+          <div className="paywall-qr-container">
+            <div className="paywall-qr-box">
+              <img
+                src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=praxis@upi&pn=Praxis&am=4999"
+                alt="Praxis Subscription UPI QR Code"
+                width={200}
+                height={200}
+                className="paywall-qr-img"
+              />
+            </div>
+            <span className="paywall-qr-hint">Scan with any UPI app (GPay, PhonePe, Paytm)</span>
+          </div>
+
+          <button
+            type="button"
+            className="login-btn paywall-btn"
+            onClick={() => setHasPaid(true)}
+          >
+            <IconCheckCircle size={18} /> I have completed the payment
+          </button>
+
+          <p className="text-muted paywall-demo-link">
+            Just want to explore?{" "}
+            <button
+              type="button"
+              className="btn-link"
+              onClick={onSignIn}
+            >
+              Go back to Login
+            </button>{" "}
+            and use the Demo Account.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="login-page animate-fade">
       <div className="login-card animate-scale">
         <div className="login-logo"><Logo /></div>
-        <p className="login-tagline">Create your Company Workspace</p>
+        <p className="login-tagline">Create your Workspace (For Factories, Students, or Researchers)</p>
+
+        {/* Payment Verified Banner */}
+        <div className="payment-verified-banner animate-fade">
+          <span>✅ Payment Verified. Create your account below.</span>
+        </div>
+
+        <SocialLoginButtons
+          onSuccess={onSignup}
+          disabled={loading}
+        />
+
         <form onSubmit={submit} className="login-form">
           {error && (
             <div className="login-error" role="alert">
@@ -120,17 +198,67 @@ export function SignupPage({ onSignup, onSignIn }: SignupPageProps) {
           )}
 
           <div className="login-field">
-            <label htmlFor="signup-company">Company / Organization Name</label>
+            <label htmlFor="signup-company">Company / Organization / Workspace Name</label>
             <input
               id="signup-company"
               type="text"
-              placeholder="e.g. Acme Industrial Corp"
+              placeholder="e.g. Acme Labs or MIT Robotics"
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
               disabled={loading}
-              required
-              minLength={2}
+              required={!inviteCode.trim()}
+              minLength={inviteCode.trim() ? undefined : 2}
             />
+          </div>
+
+          <div className="login-field">
+            <label htmlFor="signup-invite-code">Have an Invite Code? (Optional)</label>
+            <input
+              id="signup-invite-code"
+              type="text"
+              placeholder="Paste invite code"
+              value={inviteCode}
+              onChange={(e) => setInviteCode(e.target.value)}
+              disabled={loading}
+            />
+            <small
+              style={{
+                fontSize: "11px",
+                color: "var(--text-muted)",
+                marginTop: "4px",
+                display: "block",
+                lineHeight: "1.4",
+              }}
+            >
+              Joining an existing team? Paste your code here. Creating a new team? Leave this blank.
+            </small>
+          </div>
+
+          <div className="login-field">
+            <label htmlFor="signup-role">Role</label>
+            <select
+              id="signup-role"
+              value={role}
+              onChange={(e) => setRole(e.target.value as UserRole)}
+              disabled={loading}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--border-subtle)",
+                background: "var(--bg-elevated)",
+                color: "var(--text-main)",
+                fontSize: "14px",
+                outline: "none",
+              }}
+            >
+              <option value="technician">Technician</option>
+              <option value="maintenance_supervisor">Maintenance Supervisor</option>
+              <option value="production_supervisor">Production Supervisor</option>
+              <option value="plant_manager">Plant Manager</option>
+              <option value="business_owner">Business Owner</option>
+              <option value="explorer">Explorer</option>
+            </select>
           </div>
 
           <div className="login-field">
@@ -307,7 +435,13 @@ export function SignupPage({ onSignup, onSignIn }: SignupPageProps) {
           <button
             type="submit"
             className="login-btn"
-            disabled={loading || !companyName.trim() || !email.trim() || !allMet || password !== confirm}
+            disabled={
+              loading ||
+              (!inviteCode.trim() && (!companyName.trim() || companyName.trim().length < 2)) ||
+              !email.trim() ||
+              !allMet ||
+              password !== confirm
+            }
           >
             {loading ? (
               <>

@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   IconFileText,
   IconShield,
   IconLock,
   IconClock,
 } from "../components/Icons";
-import type { PublicView } from "../components/LandingLayout";
+import { LEGAL_TAB_EVENT, LEGAL_TAB_KEY, type PublicView } from "../components/LandingLayout";
 
 interface LegalPageProps {
   onNavigate: (view: PublicView) => void;
@@ -13,18 +13,42 @@ interface LegalPageProps {
 
 type LegalTab = "terms" | "privacy" | "dpa" | "sla";
 
+const LEGAL_TABS: LegalTab[] = ["terms", "privacy", "dpa", "sla"];
+
+function isLegalTab(value: unknown): value is LegalTab {
+  return typeof value === "string" && (LEGAL_TABS as string[]).includes(value);
+}
+
+function readInitialTab(): LegalTab {
+  try {
+    const saved = localStorage.getItem(LEGAL_TAB_KEY);
+    if (isLegalTab(saved)) return saved;
+  } catch {
+    // Storage unavailable
+  }
+  return "terms";
+}
+
 export function LegalPage({ onNavigate }: LegalPageProps) {
-  const [activeTab, setActiveTab] = useState<LegalTab>("terms");
+  const [activeTab, setActiveTab] = useState<LegalTab>(readInitialTab);
+
+  // Allow footer links to switch tabs while this page is already open.
+  useEffect(() => {
+    function handleTabEvent(e: Event) {
+      const tab = (e as CustomEvent<unknown>).detail;
+      if (isLegalTab(tab)) setActiveTab(tab);
+    }
+    window.addEventListener(LEGAL_TAB_EVENT, handleTabEvent);
+    return () => window.removeEventListener(LEGAL_TAB_EVENT, handleTabEvent);
+  }, []);
 
   return (
-    <div className="legal-page animate-fade">
-      {/* Hero Header */}
+    <div className="legal-page legal-document-page animate-fade">
+      {/* Plain document header (no marketing hero) */}
       <header className="legal-hero">
-        <div className="hero-badge">Trust & Compliance Portal</div>
-        <h1 className="legal-hero-title">Legal Terms & Compliance Policies</h1>
+        <h1 className="legal-hero-title">Legal &amp; Compliance</h1>
         <p className="legal-hero-subtitle">
-          Praxis provides enterprise decision intelligence built upon strict mathematical verification,
-          transparent governance, and industry-standard regulatory agreements.
+          Terms, privacy and compliance documents governing the use of the Praxis platform.
         </p>
         <div className="legal-hero-meta">
           <span>Effective Date: January 1, 2026</span>
@@ -310,6 +334,14 @@ function PrivacyPolicyContent() {
           isolated tenant partitions using pre-trained weights. Predictions are derived deterministically
           and offline. We do not expose factory telemetry to third-party model providers, external
           APIs, or public datasets.
+        </p>
+
+        <h4>AI Data Processing and Voice Privacy</h4>
+        <p>
+          Praxis uses secure AI models to analyze your decisions. When you use the voice input feature,
+          audio is processed locally by your browser's native Speech API and converted to text. We do
+          not store audio recordings. Text prompts are processed securely and are not used to train
+          public AI models.
         </p>
       </section>
 

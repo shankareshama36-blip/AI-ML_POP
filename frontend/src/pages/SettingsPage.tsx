@@ -2,6 +2,7 @@ import { useState, useEffect, type FormEvent } from "react";
 import {
   getThresholds,
   updateThresholds,
+  toggleAutoApprove,
   getWorkspace,
   rotateInviteCode,
   type User,
@@ -29,10 +30,12 @@ interface SettingsPageProps {
 
 export function SettingsPage({ user, onBack, onLogout }: SettingsPageProps) {
   const { showToast } = useToast();
-  const isAuthorized = user.role === "plant_manager" || Boolean(user.is_admin);
+  const isAuthorized = user.role === "plant_manager" || user.role === "business_owner" || Boolean(user.is_admin);
 
   const [tier1Max, setTier1Max] = useState<number>(10000);
   const [tier2Max, setTier2Max] = useState<number>(50000);
+  const [autoApprove, setAutoApprove] = useState<boolean>(false);
+  const [togglingAutoApprove, setTogglingAutoApprove] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [rotating, setRotating] = useState<boolean>(false);
@@ -53,7 +56,7 @@ export function SettingsPage({ user, onBack, onLogout }: SettingsPageProps) {
     async function loadData() {
       try {
         const [thresholdData, workspaceData] = await Promise.all([
-          getThresholds().catch(() => ({ tier1_max: 10000, tier2_max: 50000 })),
+          getThresholds().catch(() => ({ tier1_max: 10000, tier2_max: 50000, auto_approve_enabled: false })),
           getWorkspace().catch(() => null),
         ]);
 
@@ -62,6 +65,7 @@ export function SettingsPage({ user, onBack, onLogout }: SettingsPageProps) {
         if (thresholdData) {
           setTier1Max(thresholdData.tier1_max);
           setTier2Max(thresholdData.tier2_max);
+          setAutoApprove(Boolean(thresholdData.auto_approve_enabled));
         }
 
         if (workspaceData) {
@@ -113,6 +117,25 @@ export function SettingsPage({ user, onBack, onLogout }: SettingsPageProps) {
       showToast(msg, "error");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleToggleAutoApprove(newVal: boolean) {
+    setTogglingAutoApprove(true);
+    try {
+      const res = await toggleAutoApprove(newVal);
+      setAutoApprove(Boolean(res.auto_approve_enabled));
+      showToast(
+        newVal
+          ? "Autonomous AI mode enabled. Requests within Tier 1 limit will auto-approve."
+          : "Autonomous AI mode disabled. Standard supervisor approval chain active.",
+        "success"
+      );
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Failed to toggle autonomous AI mode";
+      showToast(msg, "error");
+    } finally {
+      setTogglingAutoApprove(false);
     }
   }
 
@@ -187,7 +210,7 @@ export function SettingsPage({ user, onBack, onLogout }: SettingsPageProps) {
       </header>
 
       {/* Main Content Container */}
-      <main style={{ maxWidth: "1000px", margin: "32px auto", padding: "0 24px" }}>
+      <main className="page-main" style={{ maxWidth: "1000px" }}>
         <div style={{ marginBottom: "28px" }}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", color: "var(--brand)", fontSize: "12px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "6px" }}>
             <IconSettings size={14} /> Workspace Administration
@@ -213,7 +236,7 @@ export function SettingsPage({ user, onBack, onLogout }: SettingsPageProps) {
             <p className="text-muted" style={{ marginTop: "12px" }}>Loading workspace governance data…</p>
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "24px" }}>
+          <div className="settings-grid">
             {/* Left Column: Approval Thresholds Configuration */}
             <div className="card" style={{ padding: "24px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
@@ -238,6 +261,91 @@ export function SettingsPage({ user, onBack, onLogout }: SettingsPageProps) {
                 <div>
                   <strong>Tier 3 (High Capital):</strong> Costs exceeding Tier 2 require full <em>Plant Manager</em> authorization.
                 </div>
+              </div>
+
+              {/* Autonomous AI Decision Mode Card */}
+              <div
+                style={{
+                  background: autoApprove ? "rgba(37, 99, 235, 0.08)" : "var(--bg-elevated)",
+                  border: `1px solid ${autoApprove ? "var(--brand)" : "var(--border-subtle)"}`,
+                  borderRadius: "var(--radius-md)",
+                  padding: "16px",
+                  marginBottom: "20px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "16px",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                    <strong style={{ fontSize: "14px", color: "var(--text-primary)" }}>
+                      Enable Autonomous AI Decisions
+                    </strong>
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        padding: "2px 6px",
+                        borderRadius: "10px",
+                        background: autoApprove ? "#22c55e" : "var(--border-subtle)",
+                        color: autoApprove ? "#fff" : "var(--text-muted)",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {autoApprove ? "Active" : "Off"}
+                    </span>
+                  </div>
+                  <p className="text-muted" style={{ margin: 0, fontSize: "12px", lineHeight: "1.5" }}>
+                    When enabled, complaints evaluated within the Tier 1 safety limit auto-approve instantly, bypassing manual supervisor chains.
+                  </p>
+                </div>
+                <label
+                  style={{
+                    position: "relative",
+                    display: "inline-block",
+                    width: "48px",
+                    height: "26px",
+                    flexShrink: 0,
+                    cursor: togglingAutoApprove ? "wait" : "pointer",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={autoApprove}
+                    disabled={togglingAutoApprove}
+                    onChange={(e) => void handleToggleAutoApprove(e.target.checked)}
+                    style={{ opacity: 0, width: 0, height: 0, position: "absolute" }}
+                    aria-label="Enable Autonomous AI Decisions"
+                  />
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      backgroundColor: autoApprove ? "var(--brand, #2563eb)" : "var(--border-default, #cbd5e1)",
+                      transition: "0.2s ease",
+                      borderRadius: "26px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        position: "absolute",
+                        height: "20px",
+                        width: "20px",
+                        left: autoApprove ? "25px" : "3px",
+                        bottom: "3px",
+                        backgroundColor: "#ffffff",
+                        transition: "0.2s ease",
+                        borderRadius: "50%",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
+                      }}
+                    />
+                  </span>
+                </label>
               </div>
 
               <form onSubmit={handleSaveThresholds}>

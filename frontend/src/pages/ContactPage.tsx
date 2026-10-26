@@ -43,14 +43,13 @@ export function ContactPage({ onNavigate }: ContactPageProps) {
   }
 
   return (
-    <div className="contact-page animate-fade">
-      {/* Header */}
+    <div className="contact-page contact-document-page animate-fade">
+      {/* Focused page header (no marketing hero) */}
       <header className="contact-hero">
-        <div className="hero-badge">Direct Line to Praxis</div>
-        <h1 className="contact-hero-title">Get in touch with our team.</h1>
+        <h1 className="contact-hero-title">Contact us</h1>
         <p className="contact-hero-subtitle">
-          Have questions about deployment, custom machine integrations, or enterprise SLAs? Our
-          operational intelligence engineers are here to help.
+          Questions about deployment, integrations, or enterprise plans? Send us a message and an
+          engineer will reply within 24 hours.
         </p>
       </header>
 

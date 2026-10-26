@@ -121,3 +121,33 @@ def test_role_must_match_current_pending_status() -> None:
     )
     assert step3.status == "APPROVED"
 
+
+def test_autonomous_ai_auto_approval() -> None:
+    """When auto_approve_enabled is true, complaints under tier1_max auto-approve."""
+    from uuid import uuid4
+    from backend.app.tenancy import set_auto_approve
+
+    init_db()
+    tenant_id = str(uuid4())
+    set_auto_approve(tenant_id, True)
+
+    # 1. Cost under tier1_max (10,000) -> auto approves immediately
+    c1 = create_complaint(
+        ComplaintCreate(machine_id="M-AI-1", problem_type="Minor Sensor Drift", severity="LOW"),
+        submitted_by="explorer@praxis.local",
+        tenant_id=tenant_id,
+    )
+    updated1 = attach_decision(c1.complaint_id, {"expected_cost": 4500}, 4500, tenant_id=tenant_id)
+    assert updated1.status == "APPROVED"
+    assert any(a["role"] == "autonomous_ai" for a in updated1.approvals)
+
+    # 2. Cost over tier1_max -> requires human approval chain
+    c2 = create_complaint(
+        ComplaintCreate(machine_id="M-AI-2", problem_type="Motor Overheating", severity="HIGH"),
+        submitted_by="explorer@praxis.local",
+        tenant_id=tenant_id,
+    )
+    updated2 = attach_decision(c2.complaint_id, {"expected_cost": 15000}, 15000, tenant_id=tenant_id)
+    assert updated2.status == "PENDING_MAINT"
+
+

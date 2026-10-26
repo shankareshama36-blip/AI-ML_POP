@@ -10,7 +10,7 @@ from backend.app.config import (
     JWT_EXPIRE_HOURS,
     JWT_SECRET,
 )
-from backend.app.db import init_db
+from backend.app.db import SessionLocal, Tenant, init_db
 from backend.app.main import app
 
 client = TestClient(app)
@@ -218,4 +218,92 @@ def test_forgot_password_with_demo_alias() -> None:
     data = res.json()
     assert "reset_token" in data
     assert data["reset_token"] is not None
+
+
+def test_social_login() -> None:
+    init_db()
+    # 1. New social user signup
+    oauth_email = f"oauth-{uuid4().hex[:8]}@example.com"
+    res = client.post(
+        "/auth/social-login",
+        json={"provider": "google", "email": oauth_email, "name": "Google User"},
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert "token" in data
+    assert data["user"]["email"] == oauth_email
+    assert data["user"]["role"] == "business_owner"
+    assert data["user"]["is_admin"] is True
+    assert "tenant_id" in data["user"]
+
+    # 2. Existing social user login returns same user & tenant
+    res2 = client.post(
+        "/auth/social-login",
+        json={"provider": "google", "email": oauth_email, "name": "Google User"},
+    )
+    assert res2.status_code == 200
+    data2 = res2.json()
+    assert data2["user"]["id"] == data["user"]["id"]
+    assert data2["user"]["tenant_id"] == data["user"]["tenant_id"]
+
+
+def test_signup_with_valid_invite_code() -> None:
+    init_db()
+    # 1. Admin signs up and creates a new company workspace
+    admin_email = f"admin-{uuid4().hex[:8]}@example.com"
+    admin_signup = client.post(
+        "/auth/signup",
+        json={
+            "email": admin_email,
+            "password": "AdminPassword123!",
+            "role": "business_owner",
+            "company_name": "InviteTestCorp",
+        },
+    )
+    assert admin_signup.status_code == 201
+    admin_data = admin_signup.json()
+    tenant_id = admin_data["user"]["tenant_id"]
+    assert admin_data["user"]["is_admin"] is True
+
+    # 2. Look up the workspace invite code in DB
+    with SessionLocal() as session:
+        from uuid import UUID
+        tenant = session.get(Tenant, UUID(tenant_id))
+        assert tenant is not None
+        invite_code = tenant.invite_code
+        assert invite_code is not None
+
+    # 3. New team member signs up with the invite code (without creating a new company)
+    member_email = f"member-{uuid4().hex[:8]}@example.com"
+    member_signup = client.post(
+        "/auth/signup",
+        json={
+            "email": member_email,
+            "password": "MemberPassword123!",
+            "role": "technician",
+            "invite_code": invite_code,
+        },
+    )
+    assert member_signup.status_code == 201
+    member_data = member_signup.json()
+    assert member_data["user"]["tenant_id"] == tenant_id
+    assert member_data["user"]["company_name"] == "InviteTestCorp"
+    assert member_data["user"]["is_admin"] is False
+
+
+def test_signup_with_invalid_invite_code() -> None:
+    init_db()
+    res = client.post(
+        "/auth/signup",
+        json={
+            "email": f"invalid-code-{uuid4().hex[:8]}@example.com",
+            "password": "MemberPassword123!",
+            "role": "technician",
+            "invite_code": "totally-invalid-code-123",
+        },
+    )
+    assert res.status_code == 400
+    assert res.json() == {"detail": "Invalid or expired invite code."}
+
+
 

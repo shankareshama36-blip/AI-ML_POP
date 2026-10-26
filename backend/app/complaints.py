@@ -170,7 +170,17 @@ def attach_decision(
     thresholds = get_thresholds(row.tenant_id)
     row.decision = {**decision_dict, "approval_policy": thresholds.as_dict()}
     row.approval_chain = get_approval_chain(expected_cost, thresholds.tier1_max, thresholds.tier2_max)
-    row.status = "PENDING_MAINT"
+    if thresholds.auto_approve_enabled and expected_cost <= thresholds.tier1_max:
+        row.status = "APPROVED"
+        row.approvals = [*row.approvals, {
+            "role": "autonomous_ai",
+            "username": "Praxis Autonomous Agent",
+            "timestamp": datetime.now(UTC).isoformat(),
+            "action": "APPROVED",
+            "comment": "Auto-approved by Autonomous AI mode within safety threshold",
+        }]
+    else:
+        row.status = "PENDING_MAINT"
     return _save(row)
 
 

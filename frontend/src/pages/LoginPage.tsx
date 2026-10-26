@@ -3,6 +3,7 @@ import { login, pingHealth, type User } from "../api";
 import { IconSpinner } from "../components/Icons";
 import { Logo } from "../components/Logo";
 import { useToast, formatUserFriendlyError } from "../components/Toast";
+import { SocialLoginButtons } from "../components/SocialLoginButtons";
 
 interface LoginPageProps {
   onLogin: (user: User, token: string, persist?: boolean) => void;
@@ -75,6 +76,17 @@ export function LoginPage({ onLogin, onBack, onSignup, onForgotPassword }: Login
     }
   }
 
+  const [demoLoggingIn, setDemoLoggingIn] = useState(false);
+
+  async function handleQuickDemo() {
+    setDemoLoggingIn(true);
+    try {
+      await handleDemoLogin("tech@praxis.local", "Tech@12345");
+    } finally {
+      setDemoLoggingIn(false);
+    }
+  }
+
   return (
     <div className="login-page animate-fade">
       <div className="login-card animate-scale">
@@ -90,6 +102,31 @@ export function LoginPage({ onLogin, onBack, onSignup, onForgotPassword }: Login
         )}
         <div className="login-logo"><Logo /></div>
         <p className="login-tagline">AI can act. Praxis decides.</p>
+
+        <SocialLoginButtons
+          onSuccess={(user, token) => onLogin(user, token, remember)}
+          disabled={loading}
+        />
+
+        {/* 1-Click Live Demo Login */}
+        <div className="demo-live-banner">
+          <button
+            type="button"
+            className="demo-live-hero-btn"
+            onClick={() => void handleQuickDemo()}
+            disabled={loading}
+            aria-label="Try the live demo free with pre-seeded demo account"
+          >
+            {demoLoggingIn ? (
+              <>
+                <IconSpinner size={18} /> Entering Live Demo…
+              </>
+            ) : (
+              "🚀 Try the Live Demo (Free)"
+            )}
+          </button>
+        </div>
+
         <form onSubmit={handleSubmit} className="login-form">
           <div className="login-field">
             <label htmlFor="login-email">Email</label>

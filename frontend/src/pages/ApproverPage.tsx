@@ -309,7 +309,7 @@ export function ApproverPage({ user, onLogout, onOpenSettings }: ApproverPagePro
                 <div className="empty-state-icon-wrap success">
                   <IconCheck size={28} />
                 </div>
-                <h4 className="empty-state-title">All clear</h4>
+                <h4 className="empty-state-title">No pending complaints. All clear!</h4>
                 <p className="empty-state-subtitle">
                   {user.role === "production_supervisor"
                     ? "No complaints waiting for Production Supervisor review."
@@ -507,40 +507,42 @@ export function ApproverPage({ user, onLogout, onOpenSettings }: ApproverPagePro
                         <div className="detail-label" style={{ marginBottom: "8px" }}>
                           Candidate Alternatives
                         </div>
-                        <table className="data-table">
-                          <thead>
-                            <tr>
-                              <th>Action</th>
-                              <th>Type</th>
-                              <th>Description</th>
-                              <th>Status</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {CANDIDATE_ACTIONS.map((cand) => {
-                              const isRecommended =
-                                cand.id === selectedComplaint.decision?.recommended_action_id;
-                              return (
-                                <tr key={cand.id} className={isRecommended ? "best" : ""}>
-                                  <td>
-                                    <strong>{cand.id}</strong> {isRecommended && "★"}
-                                  </td>
-                                  <td>
-                                    <code style={{ color: "var(--brand)" }}>{cand.type}</code>
-                                  </td>
-                                  <td>{cand.desc}</td>
-                                  <td>
-                                    {isRecommended ? (
-                                      <span className="text-success">Optimal Choice</span>
-                                    ) : (
-                                      <span className="text-muted">Alternative</span>
-                                    )}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
+                        <div className="table-responsive">
+                          <table className="data-table">
+                            <thead>
+                              <tr>
+                                <th>Action</th>
+                                <th>Type</th>
+                                <th>Description</th>
+                                <th>Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {CANDIDATE_ACTIONS.map((cand) => {
+                                const isRecommended =
+                                  cand.id === selectedComplaint.decision?.recommended_action_id;
+                                return (
+                                  <tr key={cand.id} className={isRecommended ? "best" : ""}>
+                                    <td>
+                                      <strong>{cand.id}</strong> {isRecommended && "★"}
+                                    </td>
+                                    <td>
+                                      <code style={{ color: "var(--brand)" }}>{cand.type}</code>
+                                    </td>
+                                    <td>{cand.desc}</td>
+                                    <td>
+                                      {isRecommended ? (
+                                        <span className="text-success">Optimal Choice</span>
+                                      ) : (
+                                        <span className="text-muted">Alternative</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     </div>
                   )}

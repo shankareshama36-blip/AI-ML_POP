@@ -15,8 +15,10 @@ dependencies = [
     "joblib",
     "slowapi",
     "sqlalchemy",
+    "psycopg[binary]",
     "bcrypt",
     "python-jose[cryptography]",
+    "google-generativeai",
 ]
 
 [project.optional-dependencies]
