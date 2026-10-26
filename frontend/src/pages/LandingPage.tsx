@@ -1,4 +1,5 @@
 import { useEffect, useState, type ComponentType } from "react";
+import { getDecisionsCount, pingHealth } from "../api";
 import {
   IconArrowRight, IconCheckCircle, IconClipboard, IconClock,
   IconCpu, IconLayers, IconSearch, IconShield, IconTrending, IconWrench,
@@ -42,13 +43,14 @@ export function LandingPage({ onSignIn, onGetStarted }: LandingPageProps) {
   const [decisionCount, setDecisionCount] = useState(0);
 
   useEffect(() => {
-    const controller = new AbortController();
-    const base = import.meta.env.VITE_API_BASE_URL || "/api";
-    void fetch(`${base}/analytics/decisions-count`, { signal: controller.signal })
-      .then((response) => response.ok ? response.json() as Promise<{ count?: number }> : { count: 0 })
-      .then((data) => setDecisionCount(Number.isFinite(data.count) ? data.count ?? 0 : 0))
-      .catch(() => setDecisionCount(0));
-    return () => controller.abort();
+    void pingHealth();
+    let isMounted = true;
+    void getDecisionsCount().then((count) => {
+      if (isMounted) setDecisionCount(count);
+    });
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });

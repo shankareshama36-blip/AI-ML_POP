@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { logout, verifyToken, type User } from "./api";
+import { ApiError, logout, pingHealth, verifyToken, type User } from "./api";
 import { LandingPage } from "./pages/LandingPage";
 import { LoginPage } from "./pages/LoginPage";
 import { SignupPage } from "./pages/SignupPage";
@@ -17,19 +17,42 @@ function App() {
   const [restoringSession, setRestoringSession] = useState(true);
 
   useEffect(() => {
+    // Proactively ping health endpoint to wake up Render container
+    void pingHealth();
+
     async function restoreSession() {
+      const hasToken = localStorage.getItem("praxis-token") || sessionStorage.getItem("praxis-token");
+      if (!hasToken) {
+        setView(localStorage.getItem("praxis-welcome") ? "login" : "landing");
+        setRestoringSession(false);
+        return;
+      }
+
       try {
-        if (localStorage.getItem("praxis-token") || sessionStorage.getItem("praxis-token")) {
-          const verified = await verifyToken();
-          setUser(verified);
-          localStorage.setItem("praxis-user", JSON.stringify(verified));
-          setView("app");
+        const verified = await verifyToken();
+        setUser(verified);
+        localStorage.setItem("praxis-user", JSON.stringify(verified));
+        setView("app");
+      } catch (err) {
+        // Only invalidate session on explicit 401 Unauthorized (token expired or revoked)
+        if (err instanceof ApiError && err.status === 401) {
+          logout();
+          setView("login");
         } else {
+          // If server is cold-starting or temporarily offline, restore from cached user
+          const cachedUserStr = localStorage.getItem("praxis-user") ?? sessionStorage.getItem("praxis-user");
+          if (cachedUserStr) {
+            try {
+              const cachedUser = JSON.parse(cachedUserStr) as User;
+              setUser(cachedUser);
+              setView("app");
+              return;
+            } catch {
+              // Ignore parse error
+            }
+          }
           setView(localStorage.getItem("praxis-welcome") ? "login" : "landing");
         }
-      } catch {
-        logout();
-        setView(localStorage.getItem("praxis-welcome") ? "login" : "landing");
       } finally {
         setRestoringSession(false);
       }

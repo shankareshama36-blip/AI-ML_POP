@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from "react";
-import { ApiError, login, type User } from "../api";
+import { useState, useEffect, type FormEvent } from "react";
+import { ApiError, login, pingHealth, type User } from "../api";
 import { IconAlert, IconSpinner } from "../components/Icons";
 import { Logo } from "../components/Logo";
 
@@ -22,13 +22,22 @@ export function LoginPage({ onLogin, onBack, onSignup, onForgotPassword }: Login
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [isWakingUp, setIsWakingUp] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDemo, setShowDemo] = useState(true);
+
+  useEffect(() => {
+    // Ping backend when login page opens to warm up Render instance
+    void pingHealth();
+  }, []);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setLoading(true);
+    setIsWakingUp(false);
     setError(null);
+    const wakeTimer = setTimeout(() => setIsWakingUp(true), 3500);
+
     try {
       const result = await login(email.trim(), password);
       onLogin(result.user, result.token, remember);
@@ -46,6 +55,8 @@ export function LoginPage({ onLogin, onBack, onSignup, onForgotPassword }: Login
           : "Login failed. Please verify the backend API is running."
       );
     } finally {
+      clearTimeout(wakeTimer);
+      setIsWakingUp(false);
       setLoading(false);
     }
   }
@@ -55,6 +66,9 @@ export function LoginPage({ onLogin, onBack, onSignup, onForgotPassword }: Login
     setPassword(demoPass);
     setError(null);
     setLoading(true);
+    setIsWakingUp(false);
+    const wakeTimer = setTimeout(() => setIsWakingUp(true), 3500);
+
     try {
       const result = await login(demoEmail, demoPass, true);
       onLogin(result.user, result.token, true);
@@ -72,6 +86,8 @@ export function LoginPage({ onLogin, onBack, onSignup, onForgotPassword }: Login
           : "Demo sign-in failed. Please verify the backend API is running."
       );
     } finally {
+      clearTimeout(wakeTimer);
+      setIsWakingUp(false);
       setLoading(false);
     }
   }
@@ -156,6 +172,19 @@ export function LoginPage({ onLogin, onBack, onSignup, onForgotPassword }: Login
               "Sign In"
             )}
           </button>
+          {isWakingUp && loading && (
+            <p
+              style={{
+                fontSize: "0.82rem",
+                color: "#64748b",
+                textAlign: "center",
+                marginTop: "10px",
+                lineHeight: "1.35",
+              }}
+            >
+              Connecting to backend… Free-tier instance is waking up (may take 20–45s).
+            </p>
+          )}
         </form>
 
         <div className="login-demo-toggle" style={{ marginTop: "16px", textAlign: "center" }}>

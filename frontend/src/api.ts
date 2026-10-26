@@ -156,23 +156,91 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+export async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs = 60000
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  if (options.signal) {
+    if (options.signal.aborted) {
+      controller.abort();
+    } else {
+      options.signal.addEventListener("abort", () => controller.abort());
+    }
+  }
+
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    return response;
+  } catch (error: unknown) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error(
+        `Request timed out after ${Math.round(timeoutMs / 1000)}s. The backend may be waking up (cold start). Please try again.`
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+export async function pingHealth(): Promise<boolean> {
+  try {
+    const res = await fetchWithTimeout(`${BASE}/health`, { method: "GET" }, 15000);
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function request<T>(path: string, options: RequestInit = {}, timeoutMs = 60000): Promise<T> {
   const token = localStorage.getItem("praxis-token") ?? sessionStorage.getItem("praxis-token");
   const headers = new Headers(options.headers);
   headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  const res = await fetch(`${BASE}${path}`, { ...options, headers });
-  if (!res.ok) {
-    const body = await res.text();
+
+  const maxRetries = 2;
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const parsed = JSON.parse(body) as { detail?: string };
-      throw new ApiError(res.status, parsed.detail || body);
-    } catch (error) {
-      if (error instanceof ApiError) throw error;
-      throw new ApiError(res.status, body);
+      const res = await fetchWithTimeout(`${BASE}${path}`, { ...options, headers }, timeoutMs);
+
+      // Render free-tier cold start retry on gateway errors
+      if ((res.status === 502 || res.status === 503 || res.status === 504) && attempt < maxRetries) {
+        await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)));
+        continue;
+      }
+
+      if (!res.ok) {
+        const body = await res.text();
+        try {
+          const parsed = JSON.parse(body) as { detail?: string };
+          throw new ApiError(res.status, parsed.detail || body);
+        } catch (error) {
+          if (error instanceof ApiError) throw error;
+          throw new ApiError(res.status, body);
+        }
+      }
+      return (await res.json()) as T;
+    } catch (err: unknown) {
+      lastError = err;
+      if (err instanceof ApiError) {
+        throw err;
+      }
+      // If network error during possible cold start, retry with backoff
+      if (attempt < maxRetries) {
+        await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)));
+        continue;
+      }
+      throw err;
     }
   }
-  return res.json() as Promise<T>;
+
+  throw lastError;
 }
 
 export async function signup(
@@ -246,7 +314,7 @@ export async function createComplaint(
   user: User
 ): Promise<Complaint> {
   void user;
-  const res = await fetch(`${BASE}/complaints`, {
+  const res = await fetchWithTimeout(`${BASE}/complaints`, {
     method: "POST",
     headers: getAuthHeaders(),
     body: JSON.stringify(payload),
@@ -261,7 +329,7 @@ export async function createComplaint(
 
 export async function listComplaints(user: User): Promise<Complaint[]> {
   void user;
-  const res = await fetch(`${BASE}/complaints`, {
+  const res = await fetchWithTimeout(`${BASE}/complaints`, {
     method: "GET",
     headers: getAuthHeaders(),
   });
@@ -278,7 +346,7 @@ export async function getComplaint(
   user: User
 ): Promise<Complaint> {
   void user;
-  const res = await fetch(`${BASE}/complaints/${id}`, {
+  const res = await fetchWithTimeout(`${BASE}/complaints/${id}`, {
     method: "GET",
     headers: getAuthHeaders(),
   });
@@ -295,7 +363,7 @@ export async function evaluateComplaint(
   user: User
 ): Promise<Complaint> {
   void user;
-  const res = await fetch(`${BASE}/complaints/${id}/evaluate`, {
+  const res = await fetchWithTimeout(`${BASE}/complaints/${id}/evaluate`, {
     method: "POST",
     headers: getAuthHeaders(),
   });
@@ -313,7 +381,7 @@ export async function approveComplaint(
   comment: string = ""
 ): Promise<Complaint> {
   void user;
-  const res = await fetch(`${BASE}/complaints/${id}/approve`, {
+  const res = await fetchWithTimeout(`${BASE}/complaints/${id}/approve`, {
     method: "POST",
     headers: getAuthHeaders(),
     body: JSON.stringify({ comment }),
@@ -332,7 +400,7 @@ export async function rejectComplaint(
   comment: string = ""
 ): Promise<Complaint> {
   void user;
-  const res = await fetch(`${BASE}/complaints/${id}/reject`, {
+  const res = await fetchWithTimeout(`${BASE}/complaints/${id}/reject`, {
     method: "POST",
     headers: getAuthHeaders(),
     body: JSON.stringify({ comment }),
@@ -348,7 +416,7 @@ export async function rejectComplaint(
 export async function evaluateDecision(
   input: DecisionInput
 ): Promise<DecisionResponse> {
-  const res = await fetch(`${BASE}/decisions/evaluate`, {
+  const res = await fetchWithTimeout(`${BASE}/decisions/evaluate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -365,7 +433,7 @@ export async function approveDecision(
   decisionId: string,
   approverId: string
 ): Promise<DecisionResponse> {
-  const res = await fetch(`${BASE}/decisions/${decisionId}/approval`, {
+  const res = await fetchWithTimeout(`${BASE}/decisions/${decisionId}/approval`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -379,4 +447,13 @@ export async function approveDecision(
     throw new ApiError(res.status, text);
   }
   return res.json();
+}
+
+export async function getDecisionsCount(): Promise<number> {
+  try {
+    const data = await request<{ count?: number }>("/analytics/decisions-count", { method: "GET" }, 15000);
+    return Number.isFinite(data.count) ? data.count ?? 0 : 0;
+  } catch {
+    return 0;
+  }
 }
