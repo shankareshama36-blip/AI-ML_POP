@@ -13,7 +13,7 @@ import {
   AILogo,
 } from "../components/Icons";
 import { Logo } from "../components/Logo";
-import { useToast } from "../components/Toast";
+import { useToast, formatUserFriendlyError } from "../components/Toast";
 
 interface ExplorerPageProps {
   user: User;
@@ -182,7 +182,7 @@ export function ExplorerPage({ user, onLogout, onOpenSettings, onOpenChat }: Exp
 
       showToast("Decision evaluated by Praxis AI.", "success");
     } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : "Analysis request failed", "error");
+      showToast(`Action failed: ${formatUserFriendlyError(err)}`, "error");
     } finally {
       setAnalyzing(false);
     }

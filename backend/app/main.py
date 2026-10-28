@@ -207,7 +207,7 @@ def update_decision_approval(
     decision_id: UUID,
     payload: ApprovalUpdate,
     current_user: User = Depends(
-        require_role(["maintenance_supervisor", "production_supervisor", "plant_manager", "business_owner"])
+        require_role(["maintenance_supervisor", "production_supervisor", "plant_manager"])
     ),
 ) -> DecisionWorkflowResponse:
     """Record the manager's human-in-the-loop decision."""
@@ -234,7 +234,7 @@ def record_decision_outcome(
     decision_id: UUID,
     payload: OutcomeCreate,
     current_user: User = Depends(
-        require_role(["maintenance_supervisor", "production_supervisor", "plant_manager", "business_owner"])
+        require_role(["maintenance_supervisor", "production_supervisor", "plant_manager"])
     ),
 ) -> DecisionWorkflowResponse:
     """Record execution results and add an experience-memory entry."""

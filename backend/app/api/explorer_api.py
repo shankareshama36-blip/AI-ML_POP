@@ -145,6 +145,7 @@ def _build_chat_system_instruction(ctx: dict[str, str]) -> str:
         f"Constraints: {ctx['constraints']}\n"
         f"The AI recommended: {ctx['recommended_option']}.\n"
         "Your job is to answer the user's follow-up questions conversationally.\n"
+        "If the user simply greets you (e.g., 'Hi', 'Hello', 'Hey'), respond warmly and conversationally without repeating the decision summary.\n"
         "If they ask 'why not [Option X]', explain the mathematical reasons based on the constraints (cost, risk, etc.).\n"
         "Do NOT repeat the generic summary. Answer the specific question directly and naturally.\n"
         "Never say 'As an AI' or 'As Gemini', and never mention Gemini or Google."
@@ -154,10 +155,17 @@ def _build_chat_system_instruction(ctx: dict[str, str]) -> str:
 def _generate_fallback_chat_reply(last_user_message: str, ctx: dict[str, str]) -> str:
     cleaned = last_user_message.strip()
     lowered = cleaned.lower()
+    lowered_clean = lowered.rstrip(".,!?")
 
     # Greetings
-    greetings = {"hi", "hello", "hey", "good morning", "good afternoon", "good evening", "howdy", "greetings"}
-    if lowered in greetings or any(lowered == g or lowered.startswith(g + " ") or lowered.startswith(g + "!") for g in ["hi", "hello", "hey"]):
+    greetings = {
+        "hi", "hello", "hey", "good morning", "good afternoon",
+        "good evening", "howdy", "greetings", "how are you", "whats up", "what's up",
+    }
+    if lowered_clean in greetings or any(
+        lowered_clean == g or lowered_clean.startswith(g + " ")
+        for g in ["hi", "hello", "hey"]
+    ):
         return "Hello! How can I help you with your decision today?"
 
     # Follow-up: "why not [Option X]"

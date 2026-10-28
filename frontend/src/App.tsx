@@ -74,6 +74,11 @@ function ClerkSessionListener({ onSync }: { onSync: (user: User) => void }) {
   return null;
 }
 
+const VALID_VIEWS: Set<string> = new Set([
+  "landing", "pricing", "customize", "about", "contact", "legal",
+  "login", "signup", "forgot", "app", "explorer", "settings", "chat",
+]);
+
 function getInitialUser(): User | null {
   try {
     const hasToken = localStorage.getItem("praxis-token") || sessionStorage.getItem("praxis-token");
@@ -86,9 +91,32 @@ function getInitialUser(): User | null {
   }
 }
 
+function getInitialView(initialUser: User | null): View {
+  try {
+    const saved = localStorage.getItem("praxis-current-view") ?? sessionStorage.getItem("praxis-current-view");
+    if (saved && VALID_VIEWS.has(saved)) {
+      if (initialUser) {
+        if (saved === "login" || saved === "signup" || saved === "forgot") {
+          return initialUser.role === "explorer" || initialUser.role === "creator" ? "explorer" : "app";
+        }
+        return saved as View;
+      }
+      if (PUBLIC_VIEWS.has(saved) || saved === "login" || saved === "signup" || saved === "forgot") {
+        return saved as View;
+      }
+    }
+    if (initialUser) {
+      return initialUser.role === "explorer" || initialUser.role === "creator" ? "explorer" : "app";
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return "landing";
+}
+
 function App() {
   const [user, setUser] = useState<User | null>(() => getInitialUser());
-  const [view, setView] = useState<View>("landing");
+  const [view, setView] = useState<View>(() => getInitialView(user));
 
   // Listen to hash changes from Clerk's internal Sign In / Sign Up footer links (#/login, #/signup)
   useEffect(() => {
@@ -104,11 +132,11 @@ function App() {
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
 
-  // Scroll to top when view changes and persist current view in sessionStorage
+  // Scroll to top when view changes and persist current view in localStorage
   useEffect(() => {
     try {
+      localStorage.setItem("praxis-current-view", view);
       sessionStorage.setItem("praxis-current-view", view);
-      localStorage.removeItem("praxis-current-view");
     } catch {
       // Storage blocked or quota exceeded
     }
@@ -129,6 +157,10 @@ function App() {
         const verified = await verifyToken();
         setUser(verified);
         localStorage.setItem("praxis-user", JSON.stringify(verified));
+        const savedView = localStorage.getItem("praxis-current-view");
+        if (savedView && VALID_VIEWS.has(savedView)) {
+          setView(savedView as View);
+        }
       } catch (err) {
         // Only invalidate session on explicit 401 Unauthorized (token expired or revoked)
         if (err instanceof ApiError && err.status === 401) {

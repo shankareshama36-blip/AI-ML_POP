@@ -149,7 +149,7 @@ export function ApproverPage({ user, onLogout, onOpenSettings }: ApproverPagePro
         onLogout();
         return;
       }
-      showToast(formatUserFriendlyError(err), "error");
+      showToast(`Action failed: ${formatUserFriendlyError(err)}`, "error");
     } finally {
       setActionLoading(false);
     }
@@ -180,7 +180,7 @@ export function ApproverPage({ user, onLogout, onOpenSettings }: ApproverPagePro
         onLogout();
         return;
       }
-      showToast(formatUserFriendlyError(err), "error");
+      showToast(`Action failed: ${formatUserFriendlyError(err)}`, "error");
     } finally {
       setActionLoading(false);
     }
@@ -203,7 +203,7 @@ export function ApproverPage({ user, onLogout, onOpenSettings }: ApproverPagePro
         onLogout();
         return;
       }
-      showToast(formatUserFriendlyError(err), "error");
+      showToast(`Action failed: ${formatUserFriendlyError(err)}`, "error");
     } finally {
       setActionLoading(false);
     }

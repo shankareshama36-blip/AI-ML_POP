@@ -7,7 +7,7 @@ import {
   IconSend,
   IconUser,
 } from "../components/Icons";
-import { useToast } from "../components/Toast";
+import { useToast, formatUserFriendlyError } from "../components/Toast";
 
 interface ChatPageProps {
   user: User;
@@ -208,7 +208,7 @@ export function ChatPage({ user, onBack, onLogout }: ChatPageProps) {
       const res = await chatWithExplorer(newMessages, contextStr, details);
       setMessages((prev) => [...prev, { role: "assistant", content: res.reply }]);
     } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : "Chat request failed", "error");
+      showToast(`Action failed: ${formatUserFriendlyError(err)}`, "error");
       setMessages((prev) => [
         ...prev,
         {

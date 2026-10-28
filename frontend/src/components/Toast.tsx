@@ -70,6 +70,12 @@ function cleanErrorString(raw: string): string {
     if (typeof parsed.detail === "string") {
       return cleanErrorString(parsed.detail);
     }
+    if (Array.isArray(parsed.detail) && parsed.detail.length > 0) {
+      const first = parsed.detail[0] as { msg?: string };
+      if (first && typeof first.msg === "string") {
+        return first.msg.replace(/^Value error,\s*/i, "");
+      }
+    }
     if (parsed.detail && typeof parsed.detail === "object" && "message" in parsed.detail) {
       return cleanErrorString(String(parsed.detail.message));
     }

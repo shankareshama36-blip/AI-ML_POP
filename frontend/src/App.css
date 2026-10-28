@@ -3898,11 +3898,17 @@ body { background: var(--bg-base); color: var(--text-primary); }
   .feature-grid,
   .pricing-grid,
   .pricing-trust-grid,
+  .plan-grid,
   .about-grid,
   .security-grid,
+  .security-cards-grid,
   .contact-grid,
   .settings-grid,
-  .cards-grid {
+  .cards-grid,
+  .dashboard-grid,
+  .detail-grid,
+  .metric-grid,
+  .form-grid {
     grid-template-columns: 1fr !important;
     gap: 16px !important;
   }
