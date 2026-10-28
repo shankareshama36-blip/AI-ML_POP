@@ -97,7 +97,7 @@ async def handle_clerk_webhook(request: Request) -> dict[str, Any]:
         email = email.lower().strip()
         role = (
             data.get("public_metadata", {}).get("role")
-            or "business_owner"
+            or "explorer"
         )
 
         with SessionLocal() as session:

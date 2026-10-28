@@ -1,9 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SignUp } from "@clerk/clerk-react";
-import { login, type User } from "../api";
-import { IconSpinner } from "../components/Icons";
+import { type User, type UserRole } from "../api";
 import { Logo } from "../components/Logo";
-import { useToast, formatUserFriendlyError } from "../components/Toast";
 
 interface SignupPageProps {
   onSignup: (user: User, token: string) => void;
@@ -58,27 +56,34 @@ const clerkAppearance = {
   },
 };
 
-export function SignupPage({ onSignup, onSignIn, onBack }: SignupPageProps) {
-  const { showToast } = useToast();
-  const [loading, setLoading] = useState(false);
-  const [demoLoggingIn, setDemoLoggingIn] = useState(false);
-
-  async function handleDemoLogin() {
-    setLoading(true);
-    setDemoLoggingIn(true);
+export function SignupPage({ onBack }: SignupPageProps) {
+  const [role, setRole] = useState<UserRole>(() => {
     try {
-      const result = await login("tech@praxis.local", "Tech@12345!", true);
-      showToast("Signed in with Live Demo account", "success");
-      onSignup(result.user, result.token);
-    } catch (err) {
-      console.error("Demo signup bypass failed:", err);
-      const friendlyMsg = formatUserFriendlyError(err);
-      showToast(friendlyMsg, "error");
-    } finally {
-      setLoading(false);
-      setDemoLoggingIn(false);
+      return (localStorage.getItem("praxis-signup-role") as UserRole) || "explorer";
+    } catch {
+      return "explorer";
     }
-  }
+  });
+  const [inviteCode, setInviteCode] = useState<string>(() => {
+    try {
+      return localStorage.getItem("praxis-signup-invite") || "";
+    } catch {
+      return "";
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("praxis-signup-role", role);
+      if (inviteCode.trim()) {
+        localStorage.setItem("praxis-signup-invite", inviteCode.trim());
+      } else {
+        localStorage.removeItem("praxis-signup-invite");
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }, [role, inviteCode]);
 
   return (
     <div className="login-page animate-fade">
@@ -94,48 +99,91 @@ export function SignupPage({ onSignup, onSignIn, onBack }: SignupPageProps) {
           </button>
         )}
         <div className="login-logo"><Logo /></div>
-        <p className="login-tagline">Start governing industrial AI with formal verification.</p>
+        <p className="login-tagline">Start governing decisions with formal verification.</p>
 
-        {/* 1-Click Demo Bypass */}
-        <div className="demo-live-banner" style={{ marginBottom: "16px" }}>
-          <button
-            type="button"
-            className="demo-live-hero-btn"
-            onClick={() => void handleDemoLogin()}
-            disabled={loading}
-            aria-label="Use Demo Account for testing"
-            style={{
-              width: "100%",
-              padding: "12px 16px",
-              fontSize: "0.95rem",
-              fontWeight: 600,
-              background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-              color: "#ffffff",
-              border: "none",
-              borderRadius: "8px",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "8px",
-              boxShadow: "0 4px 12px rgba(16, 185, 129, 0.25)",
-            }}
-          >
-            {demoLoggingIn ? (
-              <>
-                <IconSpinner size={18} /> Entering Demo Mode…
-              </>
-            ) : (
-              "🚀 Use Demo Account (Bypass Clerk)"
-            )}
-          </button>
+        {/* Customizable Role & Optional Invite Code Selector */}
+        <div
+          style={{
+            marginBottom: "16px",
+            padding: "14px",
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--border-subtle)",
+            borderRadius: "10px",
+          }}
+        >
+          <div className="login-field" style={{ marginBottom: "10px" }}>
+            <label
+              htmlFor="signup-role-select"
+              style={{
+                display: "block",
+                fontSize: "12px",
+                fontWeight: 600,
+                marginBottom: "6px",
+                color: "var(--text-primary)",
+              }}
+            >
+              Choose Your Workspace Mode / Role
+            </label>
+            <select
+              id="signup-role-select"
+              value={role}
+              onChange={(e) => setRole(e.target.value as UserRole)}
+              style={{
+                width: "100%",
+                padding: "9px 12px",
+                borderRadius: "8px",
+                border: "1px solid var(--border-subtle)",
+                background: "var(--bg-surface)",
+                color: "var(--text-primary)",
+                fontSize: "13px",
+              }}
+            >
+              <option value="explorer">🧭 Explorer — Customizable AI Decision Playground</option>
+              <option value="technician">🔧 Technician — Report Machine Issues</option>
+              <option value="maintenance_supervisor">🛡️ Maintenance Supervisor — Tier 1 Approver</option>
+              <option value="production_supervisor">📈 Production Supervisor — Tier 2 Approver</option>
+              <option value="plant_manager">🏭 Plant Manager — Executive Approver &amp; Settings</option>
+            </select>
+          </div>
+
+          <div className="login-field" style={{ marginBottom: 0 }}>
+            <label
+              htmlFor="signup-invite-input"
+              style={{
+                display: "block",
+                fontSize: "12px",
+                fontWeight: 600,
+                marginBottom: "6px",
+                color: "var(--text-secondary)",
+              }}
+            >
+              Team Invite Code (Optional)
+            </label>
+            <input
+              id="signup-invite-input"
+              type="text"
+              placeholder="Leave blank for your own personal/company workspace"
+              value={inviteCode}
+              onChange={(e) => setInviteCode(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "8px 12px",
+                borderRadius: "8px",
+                border: "1px solid var(--border-subtle)",
+                background: "var(--bg-surface)",
+                color: "var(--text-primary)",
+                fontSize: "13px",
+              }}
+            />
+          </div>
         </div>
 
-        {/* Clerk Sign Up Component */}
+        {/* Clerk Sign Up Component (includes Clerk's own Sign In link in footer) */}
         {PUBLISHABLE_KEY ? (
           <div className="clerk-auth-wrapper" style={{ width: "100%", display: "flex", justifyContent: "center" }}>
             <SignUp
               routing="hash"
+              signInUrl="#/login"
               appearance={clerkAppearance}
             />
           </div>
@@ -150,21 +198,11 @@ export function SignupPage({ onSignup, onSignIn, onBack }: SignupPageProps) {
               margin: "12px 0",
             }}
           >
-            <p style={{ fontSize: "0.88rem", color: "#94a3b8", marginBottom: "12px" }}>
-              Clerk authentication enabled. Configure <code>VITE_CLERK_PUBLISHABLE_KEY</code> in your environment to load your live Clerk sign-up form.
-            </p>
-            <p style={{ fontSize: "0.85rem", color: "#38bdf8" }}>
-              Click <strong>&quot;Use Demo Account&quot;</strong> above to explore immediately.
+            <p style={{ fontSize: "0.88rem", color: "#94a3b8", marginBottom: 0 }}>
+              Configure <code>VITE_CLERK_PUBLISHABLE_KEY</code> in your environment to load Clerk sign-up.
             </p>
           </div>
         )}
-
-        <p className="text-muted" style={{ textAlign: "center", marginTop: "18px" }}>
-          Already have an account?{" "}
-          <button type="button" className="btn-link" onClick={onSignIn}>
-            Sign In
-          </button>
-        </p>
       </div>
     </div>
   );

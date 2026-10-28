@@ -40,11 +40,10 @@ Follow these step-by-step instructions to complete the Clerk authentication conf
 1. Open the [Clerk Dashboard](https://dashboard.clerk.com/) and select your Praxis application.
 2. In the left navigation menu, go to **Configure** -> **Webhooks**.
 3. Click **+ Add Endpoint**.
-4. In the **Endpoint URL** field, enter your Render backend webhook URL:
+4. In the **Endpoint URL** field, enter your live Render backend webhook URL:
    ```text
-   https://praxis-backend-r4tp.onrender.com/webhooks/clerk
+   https://am-pop-backend.onrender.com/webhooks/clerk
    ```
-   *(Note: If your backend service uses a different Render subdomain such as `https://am-pop-backend.onrender.com`, use `<your-backend-url>/webhooks/clerk`).*
 5. Under **Message Filtering / Subscribe to events**, search for and check:
    - `user.created` (Required — automatically provisions a multi-tenant workspace and default role in PostgreSQL when a user signs up)
    - `user.updated` (Optional — syncs role updates)

@@ -392,6 +392,19 @@ export async function verifyToken(): Promise<User> {
   return (await request<{ user: User }>("/auth/verify", { method: "POST" })).user;
 }
 
+export async function updateProfile(
+  role?: UserRole,
+  invite_code?: string
+): Promise<AuthResult> {
+  const body: Record<string, string> = {};
+  if (role) body.role = role;
+  if (invite_code && invite_code.trim()) body.invite_code = invite_code.trim();
+  return request<AuthResult>("/auth/profile", {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
 export function logout(): void {
   localStorage.removeItem("praxis-token");
   localStorage.removeItem("praxis-user");

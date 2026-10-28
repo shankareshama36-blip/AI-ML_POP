@@ -187,10 +187,6 @@ def attach_decision(
 def _assert_authorized_step(row: ComplaintWorkflow, role: str, action: str) -> None:
     if row.status in ("APPROVED", "REJECTED"):
         raise ValueError(f"Complaint is already in final state: {row.status}")
-    if role == "business_owner":
-        if row.status not in ("PENDING_MAINT", "PENDING_PROD", "PENDING_PLANT"):
-            raise ValueError(f"Role '{role}' cannot {action} a complaint in status '{row.status}'")
-        return
     expected_status = _ROLE_TO_STATUS.get(role)
     if expected_status is None or row.status != expected_status:
         raise ValueError(f"Role '{role}' cannot {action} a complaint in status '{row.status}'")
@@ -207,7 +203,11 @@ def approve_complaint(
     complaint_id: UUID, username: str, role: str, comment: str = "", *, tenant_id: UUID | str
 ) -> ComplaintRecord:
     row = _get_row(complaint_id, tenant_id)
+    if row.submitted_by.strip().lower() == username.strip().lower():
+        raise ValueError("Submitter cannot approve their own complaint")
     _assert_authorized_step(row, role, "approve")
+    if any(str(a.get("username", "")).strip().lower() == username.strip().lower() for a in row.approvals):
+        raise ValueError("User cannot approve multiple tiers of the same complaint")
 
     row.approvals = [*row.approvals, {
         "role": role,
@@ -235,6 +235,8 @@ def reject_complaint(
     complaint_id: UUID, username: str, role: str, comment: str = "", *, tenant_id: UUID | str
 ) -> ComplaintRecord:
     row = _get_row(complaint_id, tenant_id)
+    if row.submitted_by.strip().lower() == username.strip().lower():
+        raise ValueError("Submitter cannot reject their own complaint")
     _assert_authorized_step(row, role, "reject")
     row.approvals = [*row.approvals, {"role": role, "username": username, "timestamp": datetime.now(UTC).isoformat(), "action": "REJECTED", "comment": comment}]
     row.status = "REJECTED"

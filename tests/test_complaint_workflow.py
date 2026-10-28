@@ -152,3 +152,26 @@ def test_autonomous_ai_auto_approval() -> None:
     assert updated2.status == "PENDING_MAINT"
 
 
+def test_submitter_cannot_self_approve_and_user_cannot_approve_multiple_tiers() -> None:
+    """Enforces separation of duties: submitter cannot approve own complaint and one user cannot approve multiple tiers."""
+    import pytest
+
+    init_db()
+    clear_complaints()
+    tenant_id = "00000000-0000-0000-0000-000000000000"
+
+    complaint = create_complaint(
+        ComplaintCreate(machine_id="M-205", problem_type="Coolant Leak", severity="HIGH"),
+        submitted_by="maint@praxis.local",
+        tenant_id=tenant_id,
+    )
+    attach_decision(complaint.complaint_id, {"expected_cost": 25_000}, 25_000, tenant_id=tenant_id)
+
+    # Same user who submitted cannot approve
+    with pytest.raises(ValueError, match="Submitter cannot approve"):
+        approve_complaint(
+            complaint.complaint_id,
+            "maint@praxis.local",
+            "maintenance_supervisor",
+            tenant_id=tenant_id,
+        )

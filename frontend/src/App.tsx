@@ -1,6 +1,15 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@clerk/clerk-react";
-import { ApiError, login, logout, pingHealth, setClerkTokenGetter, verifyToken, type User } from "./api";
+import {
+  ApiError,
+  logout,
+  pingHealth,
+  setClerkTokenGetter,
+  updateProfile,
+  verifyToken,
+  type User,
+  type UserRole,
+} from "./api";
 import { LandingPage } from "./pages/LandingPage";
 import { AboutPage } from "./pages/AboutPage";
 import { ContactPage } from "./pages/ContactPage";
@@ -16,7 +25,7 @@ import { ExplorerPage } from "./pages/ExplorerPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ChatPage } from "./pages/ChatPage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import { ToastProvider, triggerToast } from "./components/Toast";
+import { ToastProvider } from "./components/Toast";
 import { GlobalColdStartOverlay } from "./components/GlobalColdStartOverlay";
 import { LandingLayout, type PublicView } from "./components/LandingLayout";
 import "./App.css";
@@ -24,13 +33,6 @@ import "./App.css";
 type View = "landing" | "pricing" | "customize" | "about" | "contact" | "legal" | "login" | "signup" | "forgot" | "app" | "explorer" | "settings" | "chat";
 
 const PUBLIC_VIEWS: Set<string> = new Set(["landing", "pricing", "customize", "about", "contact", "legal"]);
-
-const DEMO_ROLES: Array<{ label: string; email: string; password: string; role: string }> = [
-  { label: "Technician", email: "tech@praxis.local", password: "Tech@12345!", role: "technician" },
-  { label: "Maint. Supervisor", email: "maint@praxis.local", password: "Maint@12345!", role: "maintenance_supervisor" },
-  { label: "Prod. Supervisor", email: "prod@praxis.local", password: "Prod@12345!", role: "production_supervisor" },
-  { label: "Plant Manager", email: "plant@praxis.local", password: "Plant@12345!", role: "plant_manager" },
-];
 
 const PUBLISHABLE_KEY =
   import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ||
@@ -43,13 +45,27 @@ function ClerkSessionListener({ onSync }: { onSync: (user: User) => void }) {
   useEffect(() => {
     if (isSignedIn && userId) {
       setClerkTokenGetter(() => getToken());
-      void verifyToken()
-        .then((verified) => {
+      void (async () => {
+        try {
+          let verified = await verifyToken();
+          const pendingRole = localStorage.getItem("praxis-signup-role") as UserRole | null;
+          const pendingInvite = localStorage.getItem("praxis-signup-invite");
+          if (pendingRole || pendingInvite) {
+            try {
+              const updated = await updateProfile(pendingRole || undefined, pendingInvite || undefined);
+              verified = updated.user;
+            } catch {
+              // ignore profile update error if invite code was empty/invalid
+            } finally {
+              localStorage.removeItem("praxis-signup-role");
+              localStorage.removeItem("praxis-signup-invite");
+            }
+          }
           onSync(verified);
-        })
-        .catch((err) => {
+        } catch (err) {
           console.warn("Clerk session synchronization pending:", err);
-        });
+        }
+      })();
     } else {
       setClerkTokenGetter(null);
     }
@@ -73,8 +89,20 @@ function getInitialUser(): User | null {
 function App() {
   const [user, setUser] = useState<User | null>(() => getInitialUser());
   const [view, setView] = useState<View>("landing");
-  const [switchingRole, setSwitchingRole] = useState<string | null>(null);
-  const [ownerSubView, setOwnerSubView] = useState<"approver" | "technician">("approver");
+
+  // Listen to hash changes from Clerk's internal Sign In / Sign Up footer links (#/login, #/signup)
+  useEffect(() => {
+    function handleHashChange() {
+      const hash = window.location.hash;
+      if (hash.startsWith("#/login")) {
+        setView("login");
+      } else if (hash.startsWith("#/signup")) {
+        setView("signup");
+      }
+    }
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
 
   // Scroll to top when view changes and persist current view in sessionStorage
   useEffect(() => {
@@ -146,27 +174,7 @@ function App() {
     setView(target as View);
   }
 
-  async function handleQuickRoleSwitch(demoAccount: { label: string; email: string; password: string; role: string }) {
-    if (switchingRole || user?.role === demoAccount.role) {
-      if (view !== "app") setView("app");
-      return;
-    }
-    setSwitchingRole(demoAccount.role);
-    try {
-      const result = await login(demoAccount.email, demoAccount.password, true);
-      handleLoginSuccess(result.user, result.token, true);
-      triggerToast(`Switched to ${demoAccount.label} (${demoAccount.email})`, "info");
-    } catch {
-      triggerToast("Could not switch demo role right now. Please try again.", "error");
-    } finally {
-      setSwitchingRole(null);
-    }
-  }
-
   const isPublicView = PUBLIC_VIEWS.has(view);
-  const isDemoUser = Boolean(
-    user && (user.email.endsWith("@praxis.local") || user.email.endsWith("@ampop.local"))
-  );
   const canAccessSettings = Boolean(
     user && (user.role === "plant_manager" || user.role === "business_owner" || user.is_admin)
   );
@@ -191,23 +199,23 @@ function App() {
           />
         )}
 
-        {/* ── Unified Workspace & Demo Role Switcher Bar for Logged-In Users ── */}
+        {/* ── Workspace Navigation Bar for Logged-In Users ── */}
         {user && (
           <div className="workspace-switcher-bar" role="navigation" aria-label="Workspace navigation">
             <div className="workspace-switcher-left">
               <button
                 type="button"
-                className={`ws-nav-pill ${view === "app" ? "active" : ""}`}
-                onClick={() => setView("app")}
-              >
-                🏭 Operations Dashboard
-              </button>
-              <button
-                type="button"
                 className={`ws-nav-pill ${view === "explorer" ? "active" : ""}`}
                 onClick={() => setView("explorer")}
               >
-                🧭 AI Playground
+                🧭 Customizable AI Playground
+              </button>
+              <button
+                type="button"
+                className={`ws-nav-pill ${view === "app" ? "active" : ""}`}
+                onClick={() => setView("app")}
+              >
+                🏭 Factory Operations
               </button>
               <button
                 type="button"
@@ -225,37 +233,9 @@ function App() {
                   ⚙️ Settings
                 </button>
               )}
-              {user.role === "business_owner" && view === "app" && (
-                <button
-                  type="button"
-                  className="ws-nav-pill"
-                  onClick={() =>
-                    setOwnerSubView((prev) => (prev === "approver" ? "technician" : "approver"))
-                  }
-                  title="Switch between Supervisor Queue and Issue Reporting"
-                >
-                  {ownerSubView === "approver" ? "➕ Report Machine Issue" : "📋 View Approval Queue"}
-                </button>
-              )}
             </div>
 
             <div className="workspace-switcher-right">
-              {isDemoUser && (
-                <div className="demo-role-switcher" aria-label="Quick demo role switcher">
-                  <span className="demo-switcher-label">Demo Role:</span>
-                  {DEMO_ROLES.map((item) => (
-                    <button
-                      key={item.role}
-                      type="button"
-                      disabled={Boolean(switchingRole)}
-                      className={`demo-role-pill ${user.role === item.role && view === "app" ? "active" : ""}`}
-                      onClick={() => void handleQuickRoleSwitch(item)}
-                    >
-                      {switchingRole === item.role ? "Switching…" : item.label}
-                    </button>
-                  ))}
-                </div>
-              )}
               <button
                 type="button"
                 className={`ws-nav-pill subtle ${view === "landing" ? "active" : ""}`}
@@ -373,8 +353,7 @@ function App() {
           {/* ── Factory dashboard ── */}
           {view === "app" && user && (
             <ErrorBoundary fallbackTitle="Dashboard Error">
-              {["technician", "researcher", "explorer", "creator"].includes(user.role) ||
-              (user.role === "business_owner" && ownerSubView === "technician") ? (
+              {["technician", "researcher", "explorer", "creator"].includes(user.role) ? (
                 <TechnicianPage
                   user={user}
                   onLogout={handleLogout}

@@ -197,7 +197,7 @@ def get_current_user_clerk(
                     email=email,
                     password_hash="",
                     clerk_user_id=clerk_user_id,
-                    role="business_owner",
+                    role="explorer",
                     tenant_id=tenant.id,
                     company_name=tenant.name,
                     is_admin=True,

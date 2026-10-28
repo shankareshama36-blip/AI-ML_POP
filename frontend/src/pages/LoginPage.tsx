@@ -66,23 +66,23 @@ const clerkAppearance = {
   },
 };
 
-export function LoginPage({ onLogin, onBack, onSignup }: LoginPageProps) {
+export function LoginPage({ onLogin, onBack }: LoginPageProps) {
   const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [showDemo, setShowDemo] = useState(false);
-  const [demoLoggingIn, setDemoLoggingIn] = useState(false);
+  const [showDemoRoles, setShowDemoRoles] = useState(false);
+  const [demoLoggingIn, setDemoLoggingIn] = useState<string | null>(null);
 
   useEffect(() => {
     void pingHealth();
   }, []);
 
-  async function handleDemoLogin(demoEmail: string, demoPass: string) {
+  async function handleDemoLogin(demoEmail: string, demoPass: string, roleLabel: string) {
     setLoading(true);
-    setDemoLoggingIn(true);
+    setDemoLoggingIn(demoEmail);
 
     try {
       const result = await login(demoEmail, demoPass, true);
-      showToast(`Signed in as ${result.user.role.replace(/_/g, " ")}`, "success");
+      showToast(`Signed in as ${roleLabel}`, "success");
       onLogin(result.user, result.token, true);
     } catch (err) {
       console.error("Demo login failed:", err);
@@ -90,12 +90,8 @@ export function LoginPage({ onLogin, onBack, onSignup }: LoginPageProps) {
       showToast(friendlyMsg, "error");
     } finally {
       setLoading(false);
-      setDemoLoggingIn(false);
+      setDemoLoggingIn(null);
     }
-  }
-
-  async function handleQuickDemo() {
-    await handleDemoLogin("tech@praxis.local", "Tech@12345!");
   }
 
   return (
@@ -114,14 +110,15 @@ export function LoginPage({ onLogin, onBack, onSignup }: LoginPageProps) {
         <div className="login-logo"><Logo /></div>
         <p className="login-tagline">AI can act. Praxis decides.</p>
 
-        {/* 1-Click Demo Account Bypass */}
+        {/* Single Use Demo Account Button (expands role selector so each role logs in separately) */}
         <div className="demo-live-banner" style={{ marginBottom: "16px" }}>
           <button
             type="button"
             className="demo-live-hero-btn"
-            onClick={() => void handleQuickDemo()}
+            onClick={() => setShowDemoRoles((prev) => !prev)}
             disabled={loading}
-            aria-label="Use Demo Account for testing"
+            aria-expanded={showDemoRoles}
+            aria-label="Use Demo Account"
             style={{
               width: "100%",
               padding: "12px 16px",
@@ -141,19 +138,75 @@ export function LoginPage({ onLogin, onBack, onSignup }: LoginPageProps) {
           >
             {demoLoggingIn ? (
               <>
-                <IconSpinner size={18} /> Entering Demo Mode…
+                <IconSpinner size={18} /> Signing in to Demo…
               </>
             ) : (
-              "🚀 Use Demo Account (Bypass Clerk)"
+              <>🚀 Use Demo Account {showDemoRoles ? "▲" : "▼"}</>
             )}
           </button>
+
+          {showDemoRoles && (
+            <div
+              className="animate-slide-up"
+              style={{
+                marginTop: "10px",
+                padding: "12px",
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--border-subtle)",
+                borderRadius: "8px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  color: "var(--text-muted)",
+                }}
+              >
+                Choose a Demo Role (Separate accounts for submit &amp; multi-tier approval):
+              </div>
+              {DEMO_ACCOUNTS.map((acc) => (
+                <button
+                  key={acc.email}
+                  type="button"
+                  onClick={() => void handleDemoLogin(acc.email, acc.password, acc.role)}
+                  disabled={loading}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    width: "100%",
+                    padding: "9px 12px",
+                    background: "var(--bg-surface)",
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: "6px",
+                    cursor: loading ? "wait" : "pointer",
+                    color: "var(--text-primary)",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                  }}
+                >
+                  <span>{acc.role}</span>
+                  <code style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: 400 }}>
+                    {demoLoggingIn === acc.email ? "Signing in…" : acc.email}
+                  </code>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Clerk Sign In Component */}
+        {/* Clerk Sign In Component (includes Clerk's own Sign Up link in footer) */}
         {PUBLISHABLE_KEY ? (
           <div className="clerk-auth-wrapper" style={{ width: "100%", display: "flex", justifyContent: "center" }}>
             <SignIn
               routing="hash"
+              signUpUrl="#/signup"
               appearance={clerkAppearance}
             />
           </div>
@@ -168,86 +221,11 @@ export function LoginPage({ onLogin, onBack, onSignup }: LoginPageProps) {
               margin: "12px 0",
             }}
           >
-            <p style={{ fontSize: "0.88rem", color: "#94a3b8", marginBottom: "12px" }}>
-              Clerk authentication enabled. Configure <code>VITE_CLERK_PUBLISHABLE_KEY</code> in your environment to load your live Clerk login.
-            </p>
-            <p style={{ fontSize: "0.85rem", color: "#38bdf8" }}>
+            <p style={{ fontSize: "0.88rem", color: "#94a3b8", marginBottom: 0 }}>
               Click <strong>&quot;Use Demo Account&quot;</strong> above to explore the full dashboard instantly.
             </p>
           </div>
         )}
-
-        {/* Demo Roles Toggle */}
-        <div className="login-demo-toggle" style={{ marginTop: "16px", textAlign: "center" }}>
-          <button
-            type="button"
-            className="btn-link"
-            onClick={() => setShowDemo(!showDemo)}
-            aria-expanded={showDemo}
-            aria-controls="demo-accounts-panel"
-            style={{ fontSize: "13px" }}
-          >
-            {showDemo ? "Hide demo accounts ▲" : "Select specific demo role ▼"}
-          </button>
-        </div>
-
-        {showDemo && (
-          <div
-            id="demo-accounts-panel"
-            className="login-demo animate-slide-up"
-            role="region"
-            aria-label="Demo accounts panel"
-            style={{ marginTop: "12px", paddingTop: "12px" }}
-          >
-            <h4
-              style={{
-                fontSize: "11px",
-                fontWeight: 700,
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-                color: "var(--text-muted)",
-                marginBottom: "8px",
-              }}
-            >
-              Click any demo account to test
-            </h4>
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              {DEMO_ACCOUNTS.map((acc) => (
-                <button
-                  key={acc.email}
-                  type="button"
-                  className="demo-row"
-                  onClick={() => void handleDemoLogin(acc.email, acc.password)}
-                  disabled={loading}
-                  aria-label={`Sign in as ${acc.role}`}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1.1fr 1.3fr",
-                    alignItems: "center",
-                    gap: "6px",
-                    width: "100%",
-                    textAlign: "left",
-                    background: "var(--bg-surface)",
-                    border: "1px solid var(--border-subtle)",
-                    padding: "8px 10px",
-                    borderRadius: "var(--radius-sm)",
-                    cursor: "pointer",
-                  }}
-                >
-                  <span className="role">{acc.role}</span>
-                  <code>{acc.email}</code>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <p className="text-muted" style={{ textAlign: "center", marginTop: "18px" }}>
-          Don&apos;t have an account?{" "}
-          <button type="button" className="btn-link" onClick={onSignup}>
-            Create an account
-          </button>
-        </p>
       </div>
     </div>
   );

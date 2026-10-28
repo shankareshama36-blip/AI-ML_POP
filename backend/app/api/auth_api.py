@@ -348,6 +348,49 @@ def reset_password(request: Request, payload: ResetPasswordRequest) -> None:
         session.commit()
 
 
+class UpdateProfileRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    role: Literal[
+        "explorer",
+        "creator",
+        "researcher",
+        "business_owner",
+        "technician",
+        "maintenance_supervisor",
+        "production_supervisor",
+        "plant_manager",
+    ] | None = None
+    invite_code: str | None = None
+
+
+@router.put("/auth/profile", response_model=AuthResponse)
+def update_profile(payload: UpdateProfileRequest, current_user: CurrentUser) -> AuthResponse:
+    """Allow authenticated users (including Clerk OAuth users) to customize their role or join a team via invite code."""
+    with SessionLocal() as session:
+        user = session.get(User, int(current_user["id"]))
+        if user is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        if payload.invite_code and payload.invite_code.strip():
+            tenant = session.query(Tenant).filter_by(invite_code=payload.invite_code.strip()).first()
+            if tenant is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid or expired invite code.",
+                )
+            user.tenant_id = tenant.id
+            user.company_name = tenant.name
+
+        if payload.role:
+            user.role = payload.role
+
+        session.flush()
+        response = _auth_response(user)
+        session.commit()
+        return response
+
+
 @router.post("/auth/verify", response_model=dict[str, UserResponse])
 def verify(current_user: CurrentUser) -> dict[str, UserResponse]:
     return {"user": UserResponse(**current_user)}

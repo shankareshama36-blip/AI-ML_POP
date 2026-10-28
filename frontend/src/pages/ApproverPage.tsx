@@ -209,12 +209,14 @@ export function ApproverPage({ user, onLogout, onOpenSettings }: ApproverPagePro
     }
   }
 
-  const isRoleMatchingPending = selectedComplaint
+  const isSelfSubmitted = selectedComplaint
+    ? selectedComplaint.submitted_by.trim().toLowerCase() === user.email.trim().toLowerCase()
+    : false;
+
+  const isRoleMatchingPending = selectedComplaint && !isSelfSubmitted
     ? (user.role === "maintenance_supervisor" && selectedComplaint.status === "PENDING_MAINT") ||
       (user.role === "production_supervisor" && selectedComplaint.status === "PENDING_PROD") ||
-      (user.role === "plant_manager" && selectedComplaint.status === "PENDING_PLANT") ||
-      (user.role === "business_owner" &&
-        ["PENDING_MAINT", "PENDING_PROD", "PENDING_PLANT"].includes(selectedComplaint.status))
+      (user.role === "plant_manager" && selectedComplaint.status === "PENDING_PLANT")
     : false;
 
   const chainRoles =
@@ -432,7 +434,7 @@ export function ApproverPage({ user, onLogout, onOpenSettings }: ApproverPagePro
                       <p style={{ marginBottom: "16px" }}>
                         No automated decision has been evaluated yet for this complaint.
                       </p>
-                      {["maintenance_supervisor", "business_owner", "plant_manager"].includes(user.role) || Boolean(user.is_admin) ? (
+                      {user.role === "maintenance_supervisor" ? (
                         <button
                           type="button"
                           className="btn-primary"
