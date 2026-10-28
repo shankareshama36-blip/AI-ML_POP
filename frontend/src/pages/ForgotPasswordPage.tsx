@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
-import { ApiError, requestPasswordReset, resetPassword } from "../api";
+import { requestPasswordReset, resetPassword } from "../api";
 import { IconAlert, IconCheckCircle, IconSpinner } from "../components/Icons";
 import { Logo } from "../components/Logo";
+import { formatUserFriendlyError } from "../components/Toast";
 
 interface ForgotPasswordPageProps {
   onSignIn: () => void;
@@ -32,11 +33,7 @@ export function ForgotPasswordPage({ onSignIn }: ForgotPasswordPageProps) {
         setManualToken(result.reset_token);
       }
     } catch (caught) {
-      setError(
-        caught instanceof ApiError
-          ? caught.message
-          : "Unable to request a password reset. Please try again."
-      );
+      setError(`Action failed: ${formatUserFriendlyError(caught)}`);
     } finally {
       setLoading(false);
     }
@@ -75,11 +72,7 @@ export function ForgotPasswordPage({ onSignIn }: ForgotPasswordPageProps) {
       setResetSuccess(true);
       setMessage("Your password has been successfully reset. You can now sign in.");
     } catch (caught) {
-      setError(
-        caught instanceof ApiError
-          ? caught.message
-          : "Unable to reset password. The link or token may be invalid or expired."
-      );
+      setError(`Action failed: ${formatUserFriendlyError(caught)}`);
     } finally {
       setLoading(false);
     }

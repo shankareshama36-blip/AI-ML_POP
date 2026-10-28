@@ -20,7 +20,7 @@ import {
   IconLogout,
 } from "../components/Icons";
 import { Logo } from "../components/Logo";
-import { useToast } from "../components/Toast";
+import { useToast, formatUserFriendlyError } from "../components/Toast";
 
 interface SettingsPageProps {
   user: User;
@@ -111,7 +111,7 @@ export function SettingsPage({ user, onBack, onLogout }: SettingsPageProps) {
         "success"
       );
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Failed to update thresholds";
+      const msg = `Action failed: ${formatUserFriendlyError(err)}`;
       setError(msg);
       showToast(msg, "error");
     } finally {
@@ -131,8 +131,7 @@ export function SettingsPage({ user, onBack, onLogout }: SettingsPageProps) {
         "success"
       );
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Failed to toggle autonomous AI mode";
-      showToast(msg, "error");
+      showToast(`Action failed: ${formatUserFriendlyError(err)}`, "error");
     } finally {
       setTogglingAutoApprove(false);
     }
@@ -148,8 +147,7 @@ export function SettingsPage({ user, onBack, onLogout }: SettingsPageProps) {
       setInviteCode(updated.invite_code);
       showToast("A new secure invite code has been generated.", "info");
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Failed to rotate invite code";
-      showToast(msg, "error");
+      showToast(`Action failed: ${formatUserFriendlyError(err)}`, "error");
     } finally {
       setRotating(false);
     }

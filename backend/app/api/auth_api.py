@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
+import inspect
 import os
 import secrets
 from datetime import UTC, datetime, timedelta
@@ -25,6 +27,7 @@ from backend.app.auth_real import (
 from backend.app.config import DEMO_ACCOUNTS_ENABLED, ENV
 from backend.app.db import PasswordResetToken, SessionLocal, Tenant, User, create_tenant
 
+asyncio.iscoroutinefunction = inspect.iscoroutinefunction  # type: ignore[assignment]
 limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter(tags=["auth"])

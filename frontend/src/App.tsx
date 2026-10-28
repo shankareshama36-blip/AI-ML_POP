@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import {
   ApiError,
+  login,
   logout,
   pingHealth,
   setClerkTokenGetter,
@@ -33,6 +34,14 @@ import "./App.css";
 type View = "landing" | "pricing" | "customize" | "about" | "contact" | "legal" | "login" | "signup" | "forgot" | "app" | "explorer" | "settings" | "chat";
 
 const PUBLIC_VIEWS: Set<string> = new Set(["landing", "pricing", "customize", "about", "contact", "legal"]);
+const PROTECTED_VIEWS: Set<string> = new Set(["app", "explorer", "settings", "chat"]);
+
+const DEMO_SWITCH_ACCOUNTS = [
+  { label: "Tech", email: "tech@praxis.local", pass: "Tech@12345!" },
+  { label: "Maint Sup", email: "maint@praxis.local", pass: "Maint@12345!" },
+  { label: "Prod Sup", email: "prod@praxis.local", pass: "Prod@12345!" },
+  { label: "Plant Mgr", email: "plant@praxis.local", pass: "Plant@12345!" },
+];
 
 const PUBLISHABLE_KEY =
   import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ||
@@ -117,6 +126,7 @@ function getInitialView(initialUser: User | null): View {
 function App() {
   const [user, setUser] = useState<User | null>(() => getInitialUser());
   const [view, setView] = useState<View>(() => getInitialView(user));
+  const [switchingDemo, setSwitchingDemo] = useState<string | null>(null);
 
   // Listen to hash changes from Clerk's internal Sign In / Sign Up footer links (#/login, #/signup)
   useEffect(() => {
@@ -166,6 +176,13 @@ function App() {
         if (err instanceof ApiError && err.status === 401) {
           logout();
           setUser(null);
+          try {
+            localStorage.removeItem("praxis-current-view");
+            sessionStorage.removeItem("praxis-current-view");
+          } catch {
+            // ignore
+          }
+          setView((prev) => (PROTECTED_VIEWS.has(prev) ? "login" : prev));
         }
       }
     }
@@ -190,12 +207,33 @@ function App() {
     setView(targetView);
   }
 
+  async function handleDemoRoleSwitch(email: string, pass: string) {
+    if (user?.email === email || switchingDemo) return;
+    setSwitchingDemo(email);
+    try {
+      const res = await login(email, pass, true);
+      setUser(res.user);
+      localStorage.setItem("praxis-token", res.token);
+      localStorage.setItem("praxis-user", JSON.stringify(res.user));
+      if (view === "settings" && res.user.role !== "plant_manager") {
+        setView("app");
+      } else if (!PROTECTED_VIEWS.has(view)) {
+        setView("app");
+      }
+    } catch (err) {
+      console.error("Failed to switch demo account:", err);
+    } finally {
+      setSwitchingDemo(null);
+    }
+  }
+
   function handleLogout() {
     setUser(null);
     logout();
     setClerkTokenGetter(null);
     try {
       localStorage.removeItem("praxis-current-view");
+      sessionStorage.removeItem("praxis-current-view");
     } catch {
       // ignore
     }
@@ -210,6 +248,7 @@ function App() {
   const canAccessSettings = Boolean(
     user && (user.role === "plant_manager" || user.role === "business_owner" || user.is_admin)
   );
+  const isDemoAccount = Boolean(user && user.email.endsWith("@praxis.local"));
 
   return (
     <ErrorBoundary fallbackTitle="Application Error">
@@ -268,6 +307,23 @@ function App() {
             </div>
 
             <div className="workspace-switcher-right">
+              {isDemoAccount && (
+                <div className="demo-role-switcher" aria-label="Switch Demo Account Role">
+                  <span className="demo-switcher-label">Demo Role:</span>
+                  {DEMO_SWITCH_ACCOUNTS.map((acc) => (
+                    <button
+                      key={acc.email}
+                      type="button"
+                      className={`demo-role-pill ${user.email === acc.email ? "active" : ""}`}
+                      onClick={() => void handleDemoRoleSwitch(acc.email, acc.pass)}
+                      disabled={Boolean(switchingDemo)}
+                      title={`Switch to ${acc.email}`}
+                    >
+                      {switchingDemo === acc.email ? "…" : acc.label}
+                    </button>
+                  ))}
+                </div>
+              )}
               <button
                 type="button"
                 className={`ws-nav-pill subtle ${view === "landing" ? "active" : ""}`}
@@ -331,8 +387,8 @@ function App() {
             </LandingLayout>
           )}
 
-          {/* ── Auth views ── */}
-          {view === "login" && (
+          {/* ── Auth views (also fallback if protected view is reached while unauthenticated) ── */}
+          {(view === "login" || (PROTECTED_VIEWS.has(view) && !user)) && (
             <ErrorBoundary fallbackTitle="Login Error">
               <LoginPage
                 onLogin={handleLoginSuccess}

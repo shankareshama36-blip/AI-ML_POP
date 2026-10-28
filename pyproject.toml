@@ -41,6 +41,8 @@ include = ["backend*"]
 testpaths = ["tests"]
 filterwarnings = [
     "ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning:starlette.testclient",
+    "ignore::FutureWarning:google.generativeai.*",
+    "ignore:'asyncio.iscoroutinefunction' is deprecated:DeprecationWarning:slowapi.*",
 ]
 
 [tool.ruff]

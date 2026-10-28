@@ -167,7 +167,7 @@ export function TechnicianPage({ user, onLogout, onOpenSettings }: TechnicianPag
         onLogout();
         return;
       }
-      showToast(formatUserFriendlyError(err), "error");
+      showToast(`Action failed: ${formatUserFriendlyError(err)}`, "error");
     } finally {
       setSubmitting(false);
     }
