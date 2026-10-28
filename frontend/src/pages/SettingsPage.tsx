@@ -36,7 +36,7 @@ export function SettingsPage({ user, onBack, onLogout }: SettingsPageProps) {
   const [tier2Max, setTier2Max] = useState<number>(50000);
   const [autoApprove, setAutoApprove] = useState<boolean>(false);
   const [togglingAutoApprove, setTogglingAutoApprove] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(isAuthorized);
   const [saving, setSaving] = useState<boolean>(false);
   const [rotating, setRotating] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,7 +48,6 @@ export function SettingsPage({ user, onBack, onLogout }: SettingsPageProps) {
 
   useEffect(() => {
     if (!isAuthorized) {
-      setLoading(false);
       return;
     }
 

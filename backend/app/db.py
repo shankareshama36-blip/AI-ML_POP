@@ -35,7 +35,11 @@ from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 from sqlalchemy.schema import CreateColumn, ExecutableDDLElement
 
-from backend.app.config import DEFAULT_TIER1_MAX, DEFAULT_TIER2_MAX, DEMO_ACCOUNTS_ENABLED
+from backend.app.config import (
+    DEFAULT_TIER1_MAX,
+    DEFAULT_TIER2_MAX,
+    DEMO_ACCOUNTS_ENABLED,
+)
 
 
 def _normalise_database_url(url: str) -> str:
@@ -94,8 +98,11 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
-    password_hash: Mapped[str] = mapped_column(String(255))
-    role: Mapped[str] = mapped_column(String(64))
+    password_hash: Mapped[str] = mapped_column(String(255), default="", server_default="")
+    clerk_user_id: Mapped[str | None] = mapped_column(
+        String(255), unique=True, index=True, nullable=True
+    )
+    role: Mapped[str] = mapped_column(String(64), default="business_owner", server_default="business_owner")
     tenant_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("tenants.id"), index=True, nullable=False
     )

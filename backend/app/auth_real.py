@@ -3,14 +3,22 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 import bcrypt
-from fastapi import Header, HTTPException, status
+from clerk_backend_api import Clerk, authenticate_request
+from clerk_backend_api.security.types import AuthenticateRequestOptions
+from fastapi import Header, HTTPException, Request, status
 from jose import JWTError, jwt
 
-from backend.app.config import JWT_ALGORITHM, JWT_EXPIRE_HOURS, JWT_SECRET
+from backend.app.config import (
+    CLERK_SECRET_KEY,
+    JWT_ALGORITHM,
+    JWT_EXPIRE_HOURS,
+    JWT_SECRET,
+)
 
 COMMON_PASSWORDS = {
     "password", "12345678", "qwerty", "abc123", "password1",
@@ -94,29 +102,110 @@ def verify_jwt(token: str) -> dict[str, str] | None:
         return None
 
 
-def get_current_user(authorization: str | None = Header(default=None)) -> dict[str, object]:
-    """Resolve a bearer token into the current user, including their tenant.
+class _HeaderAuthWrapper:
+    def __init__(self, headers: Mapping[str, str]) -> None:
+        self._headers = headers
 
-    The token's ``tenant_id`` claim must match the user's persisted tenant, so a
-    token can never be used to act inside a workspace the user doesn't belong to.
+    @property
+    def headers(self) -> Mapping[str, str]:
+        return self._headers
+
+
+def get_current_user_clerk(
+    request: Request = None,  # type: ignore[assignment]
+    authorization: str | None = Header(default=None),
+) -> dict[str, object]:
+    """Resolve a Clerk bearer token into the current user, including tenant and role.
+
+    Verifies the token via Clerk SDK, extracts 'sub' (clerk_user_id), and loads
+    the corresponding multi-tenant user from the database.
     """
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing bearer token")
-    payload = verify_jwt(authorization.removeprefix("Bearer ").strip())
-    if payload is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+    auth_header = authorization
+    if not auth_header and request is not None:
+        auth_header = request.headers.get("authorization")
 
-    from backend.app.db import SessionLocal, User
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing bearer token",
+        )
+
+    raw_token = auth_header.removeprefix("Bearer ").strip()
+    clerk_user_id: str | None = None
+    email_from_token: str | None = None
+
+    if CLERK_SECRET_KEY:
+        req_obj = request if request is not None else _HeaderAuthWrapper({"authorization": auth_header})
+        opts = AuthenticateRequestOptions(secret_key=CLERK_SECRET_KEY)
+        state = authenticate_request(req_obj, opts)
+        if not state.is_authenticated or not state.payload:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Invalid Clerk token: {state.reason or 'unauthorized'}",
+            )
+        clerk_user_id = str(state.payload.get("sub", "")).strip() or None
+        email_from_token = state.payload.get("email") or state.payload.get("email_address")
+    else:
+        # Fallback for local development or testing when secret key is unset
+        try:
+            claims = jwt.get_unverified_claims(raw_token)
+            clerk_user_id = str(claims.get("sub", "")).strip() or None
+            email_from_token = claims.get("email") or claims.get("email_address")
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token format",
+            ) from None
+
+    if not clerk_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing user identifier in Clerk token",
+        )
+
+    from backend.app.db import SessionLocal, User, create_tenant
 
     with SessionLocal() as session:
-        user = session.get(User, int(payload["sub"]))
-        if (
-            user is None
-            or user.tenant_id is None
-            or user.role != payload["role"]
-            or str(user.tenant_id) != str(UUID(str(payload["tenant_id"])))
-        ):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid user token")
+        user = session.query(User).filter_by(clerk_user_id=clerk_user_id).first()
+        if user is None:
+            # Attempt to resolve email
+            email = email_from_token
+            if not email and CLERK_SECRET_KEY:
+                try:
+                    clerk_client = Clerk(bearer_auth=CLERK_SECRET_KEY)
+                    cu = clerk_client.users.get(user_id=clerk_user_id)
+                    if cu and cu.email_addresses:
+                        email = cu.email_addresses[0].email_address
+                except Exception:
+                    pass
+
+            if not email:
+                email = f"{clerk_user_id}@clerk.user"
+
+            # Check if an existing account with this email exists
+            existing_user = session.query(User).filter_by(email=email).first()
+            if existing_user is not None:
+                existing_user.clerk_user_id = clerk_user_id
+                session.commit()
+                session.refresh(existing_user)
+                user = existing_user
+            else:
+                prefix = email.split("@")[0].replace(".", " ").capitalize()
+                tenant_name = f"{prefix} Workspace"
+                tenant = create_tenant(session, tenant_name)
+                user = User(
+                    email=email,
+                    password_hash="",
+                    clerk_user_id=clerk_user_id,
+                    role="business_owner",
+                    tenant_id=tenant.id,
+                    company_name=tenant.name,
+                    is_admin=True,
+                )
+                session.add(user)
+                session.commit()
+                session.refresh(user)
+
         return {
             "id": user.id,
             "email": user.email,
@@ -124,4 +213,51 @@ def get_current_user(authorization: str | None = Header(default=None)) -> dict[s
             "tenant_id": str(user.tenant_id),
             "company_name": user.company_name,
             "is_admin": bool(user.is_admin),
+            "clerk_user_id": user.clerk_user_id,
         }
+
+
+def get_current_user(
+    request: Request = None,  # type: ignore[assignment]
+    authorization: str | None = Header(default=None),
+) -> dict[str, object]:
+    """Resolve a bearer token into the current user, including their tenant.
+
+    The token's ``tenant_id`` claim must match the user's persisted tenant, so a
+    token can never be used to act inside a workspace the user doesn't belong to.
+    Supports both legacy custom JWTs (demo accounts) and Clerk Bearer tokens.
+    """
+    auth_header = authorization
+    if not auth_header and request is not None:
+        auth_header = request.headers.get("authorization")
+
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing bearer token")
+
+    raw_token = auth_header.removeprefix("Bearer ").strip()
+
+    # 1. Try legacy custom JWT first (preserves demo accounts and test suites)
+    payload = verify_jwt(raw_token)
+    if payload is not None:
+        from backend.app.db import SessionLocal, User
+
+        with SessionLocal() as session:
+            user = session.get(User, int(payload["sub"]))
+            if (
+                user is None
+                or user.tenant_id is None
+                or user.role != payload["role"]
+                or str(user.tenant_id) != str(UUID(str(payload["tenant_id"])))
+            ):
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid user token")
+            return {
+                "id": user.id,
+                "email": user.email,
+                "role": user.role,
+                "tenant_id": str(user.tenant_id),
+                "company_name": user.company_name,
+                "is_admin": bool(user.is_admin),
+            }
+
+    # 2. Fall back to Clerk authentication
+    return get_current_user_clerk(request=request, authorization=auth_header)

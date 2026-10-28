@@ -212,7 +212,9 @@ export function ApproverPage({ user, onLogout, onOpenSettings }: ApproverPagePro
   const isRoleMatchingPending = selectedComplaint
     ? (user.role === "maintenance_supervisor" && selectedComplaint.status === "PENDING_MAINT") ||
       (user.role === "production_supervisor" && selectedComplaint.status === "PENDING_PROD") ||
-      (user.role === "plant_manager" && selectedComplaint.status === "PENDING_PLANT")
+      (user.role === "plant_manager" && selectedComplaint.status === "PENDING_PLANT") ||
+      (user.role === "business_owner" &&
+        ["PENDING_MAINT", "PENDING_PROD", "PENDING_PLANT"].includes(selectedComplaint.status))
     : false;
 
   const chainRoles =
@@ -248,7 +250,7 @@ export function ApproverPage({ user, onLogout, onOpenSettings }: ApproverPagePro
             <div className="user-avatar">{user.email.slice(0, 1)}</div>
             <span>{user.email}</span>
           </div>
-          {(user.role === "plant_manager" || Boolean(user.is_admin)) && onOpenSettings && (
+          {(user.role === "plant_manager" || user.role === "business_owner" || Boolean(user.is_admin)) && onOpenSettings && (
             <button
               type="button"
               className="action-btn secondary"
@@ -430,7 +432,7 @@ export function ApproverPage({ user, onLogout, onOpenSettings }: ApproverPagePro
                       <p style={{ marginBottom: "16px" }}>
                         No automated decision has been evaluated yet for this complaint.
                       </p>
-                      {user.role === "maintenance_supervisor" ? (
+                      {["maintenance_supervisor", "business_owner", "plant_manager"].includes(user.role) || Boolean(user.is_admin) ? (
                         <button
                           type="button"
                           className="btn-primary"

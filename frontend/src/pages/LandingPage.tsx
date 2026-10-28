@@ -39,7 +39,7 @@ const roles: Array<{ title: string; description: string; icon: Icon; level: numb
   { title: "Plant Manager", description: "Provide final safety and financial accountability.", icon: IconShield, level: 4 },
 ];
 
-export function LandingPage({ onSignIn: _onSignIn, onGetStarted }: LandingPageProps) {
+export function LandingPage({ onSignIn, onGetStarted }: LandingPageProps) {
   const [decisionCount, setDecisionCount] = useState(0);
 
   useEffect(() => {
@@ -82,6 +82,13 @@ export function LandingPage({ onSignIn: _onSignIn, onGetStarted }: LandingPagePr
                 onClick={onGetStarted}
               >
                 Get Started Free <IconArrowRight size={16} />
+              </button>
+              <button
+                type="button"
+                className="btn-ghost btn-lg hero-cta hero-cta-float hero-cta-delay"
+                onClick={onSignIn}
+              >
+                Live Demo &amp; Sign In
               </button>
               <button
                 type="button"

@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Logo } from "./Logo";
 import { IconArrowRight } from "./Icons";
 
@@ -21,8 +21,12 @@ export function LandingLayout({
   onNavigate,
   onSignIn,
   onGetStarted,
+  currentView = "landing",
 }: LandingLayoutProps) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   function handleLogoClick() {
+    setMobileMenuOpen(false);
     onNavigate("landing");
     if (typeof window !== "undefined") {
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -30,11 +34,12 @@ export function LandingLayout({
   }
 
   function handleNavLink(target: PublicView, hashId?: string) {
+    setMobileMenuOpen(false);
     onNavigate(target);
     if (hashId && typeof window !== "undefined") {
       setTimeout(() => {
         document.getElementById(hashId)?.scrollIntoView({ behavior: "smooth" });
-      }, 50);
+      }, 60);
     } else if (typeof window !== "undefined") {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -55,7 +60,7 @@ export function LandingLayout({
 
   return (
     <div className="landing-layout-wrapper animate-fade">
-      {/* Top Navbar: Logo left, Sign In + Get Started right */}
+      {/* Top Navbar: Logo left, Nav links center, Sign In + Get Started right */}
       <nav className="landing-nav" aria-label="Primary navigation">
         <button
           type="button"
@@ -66,6 +71,44 @@ export function LandingLayout({
           <Logo />
         </button>
 
+        <div className={`landing-nav-links ${mobileMenuOpen ? "open" : ""}`}>
+          <button
+            type="button"
+            className={`nav-link-btn ${currentView === "landing" ? "active" : ""}`}
+            onClick={() => handleNavLink("landing", "features")}
+          >
+            Features
+          </button>
+          <button
+            type="button"
+            className={`nav-link-btn ${currentView === "pricing" ? "active" : ""}`}
+            onClick={() => handleNavLink("pricing")}
+          >
+            Pricing
+          </button>
+          <button
+            type="button"
+            className={`nav-link-btn ${currentView === "customize" ? "active" : ""}`}
+            onClick={() => handleNavLink("customize")}
+          >
+            Customize
+          </button>
+          <button
+            type="button"
+            className={`nav-link-btn ${currentView === "about" ? "active" : ""}`}
+            onClick={() => handleNavLink("about")}
+          >
+            About
+          </button>
+          <button
+            type="button"
+            className={`nav-link-btn ${currentView === "contact" ? "active" : ""}`}
+            onClick={() => handleNavLink("contact")}
+          >
+            Contact
+          </button>
+        </div>
+
         {/* Actions: Sign In (ghost) & Get Started (primary) */}
         <div className="landing-nav-actions">
           <button type="button" className="btn-ghost nav-signin" onClick={onSignIn}>
@@ -73,6 +116,17 @@ export function LandingLayout({
           </button>
           <button type="button" className="btn-primary landing-nav-btn" onClick={onGetStarted}>
             Get Started Free <IconArrowRight size={14} />
+          </button>
+          <button
+            type="button"
+            className="nav-hamburger"
+            aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+            aria-expanded={mobileMenuOpen}
+            onClick={() => setMobileMenuOpen((prev) => !prev)}
+          >
+            <span />
+            <span />
+            <span />
           </button>
         </div>
       </nav>
@@ -107,9 +161,16 @@ export function LandingLayout({
             <button
               type="button"
               className="footer-link-btn"
-              onClick={() => handleNavLink("customize")}
+              onClick={() => handleNavLink("pricing")}
             >
               Pricing
+            </button>
+            <button
+              type="button"
+              className="footer-link-btn"
+              onClick={() => handleNavLink("customize")}
+            >
+              Customize Plan
             </button>
           </div>
 

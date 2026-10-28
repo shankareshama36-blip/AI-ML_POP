@@ -125,6 +125,7 @@ def test_role_must_match_current_pending_status() -> None:
 def test_autonomous_ai_auto_approval() -> None:
     """When auto_approve_enabled is true, complaints under tier1_max auto-approve."""
     from uuid import uuid4
+
     from backend.app.tenancy import set_auto_approve
 
     init_db()

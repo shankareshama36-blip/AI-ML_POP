@@ -1,462 +1,168 @@
-import { useMemo, useState, type FormEvent } from "react";
-import { ApiError, signup, type User, type UserRole } from "../api";
-import { IconAlert, IconCheckCircle, IconShield, IconSpinner } from "../components/Icons";
+import { useState } from "react";
+import { SignUp } from "@clerk/clerk-react";
+import { login, type User } from "../api";
+import { IconSpinner } from "../components/Icons";
 import { Logo } from "../components/Logo";
-import { SocialLoginButtons } from "../components/SocialLoginButtons";
+import { useToast, formatUserFriendlyError } from "../components/Toast";
 
 interface SignupPageProps {
   onSignup: (user: User, token: string) => void;
   onSignIn: () => void;
+  onBack?: () => void;
 }
 
-interface PasswordRule {
-  label: string;
-  met: boolean;
-}
+const PUBLISHABLE_KEY =
+  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ||
+  import.meta.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ||
+  "";
 
-function evaluatePassword(password: string) {
-  const rules: PasswordRule[] = [
-    { label: "12+ characters", met: password.length >= 12 },
-    { label: "Uppercase letter (A-Z)", met: /[A-Z]/.test(password) },
-    { label: "Lowercase letter (a-z)", met: /[a-z]/.test(password) },
-    { label: "At least one digit (0-9)", met: /[0-9]/.test(password) },
-    { label: "Special symbol (!@#$...)", met: /[^A-Za-z0-9]/.test(password) },
-  ];
+const clerkAppearance = {
+  variables: {
+    colorPrimary: "#2563eb",
+    colorBackground: "#0f172a",
+    colorText: "#f8fafc",
+    colorTextSecondary: "#94a3b8",
+    colorInputBackground: "#1e293b",
+    colorInputText: "#f8fafc",
+    borderRadius: "0.5rem",
+  },
+  elements: {
+    card: {
+      background: "#0f172a",
+      border: "1px solid #334155",
+      boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.5)",
+    },
+    headerTitle: {
+      color: "#f8fafc",
+    },
+    headerSubtitle: {
+      color: "#94a3b8",
+    },
+    socialButtonsBlockButton: {
+      border: "1px solid #334155",
+      background: "#1e293b",
+      color: "#f8fafc",
+      "&:hover": {
+        background: "#334155",
+      },
+    },
+    formButtonPrimary: {
+      background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+      "&:hover": {
+        background: "linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)",
+      },
+    },
+    footerActionLink: {
+      color: "#60a5fa",
+    },
+  },
+};
 
-  const metCount = rules.filter((r) => r.met).length;
-
-  let strength: "weak" | "medium" | "strong" = "weak";
-  if (metCount === 5 && password.length >= 12) {
-    strength = "strong";
-  } else if (metCount >= 3 && password.length >= 8) {
-    strength = "medium";
-  }
-
-  const allMet = metCount === rules.length && password.length <= 128;
-  return { rules, strength, allMet, metCount };
-}
-
-export function SignupPage({ onSignup, onSignIn }: SignupPageProps) {
-  const [hasPaid, setHasPaid] = useState(false);
-  const [companyName, setCompanyName] = useState("");
-  const [inviteCode, setInviteCode] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [role, setRole] = useState<UserRole>("technician");
+export function SignupPage({ onSignup, onSignIn, onBack }: SignupPageProps) {
+  const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [demoLoggingIn, setDemoLoggingIn] = useState(false);
 
-  const { rules, strength, allMet } = useMemo(() => evaluatePassword(password), [password]);
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    setError(null);
-    if (!inviteCode.trim() && (!companyName.trim() || companyName.trim().length < 2)) {
-      return setError("Enter your company or organization name (at least 2 characters) or provide an invite code.");
-    }
-    if (!/^\S+@\S+\.\S+$/.test(email)) {
-      return setError("Enter a valid email address.");
-    }
-    if (!allMet) {
-      return setError("Please satisfy all password security requirements.");
-    }
-    if (password !== confirm) {
-      return setError("Passwords do not match.");
-    }
-
+  async function handleDemoLogin() {
     setLoading(true);
+    setDemoLoggingIn(true);
     try {
-      const result = await signup(
-        email.trim(),
-        password,
-        role,
-        companyName.trim() || undefined,
-        inviteCode.trim() || undefined
-      );
-      setSuccess(true);
-      setTimeout(() => {
-        onSignup(result.user, result.token);
-      }, 800);
-    } catch (caught) {
-      setError(
-        caught instanceof ApiError
-          ? caught.message
-          : "Could not create your account. Please try again."
-      );
+      const result = await login("tech@praxis.local", "Tech@12345!", true);
+      showToast("Signed in with Live Demo account", "success");
+      onSignup(result.user, result.token);
+    } catch (err) {
+      console.error("Demo signup bypass failed:", err);
+      const friendlyMsg = formatUserFriendlyError(err);
+      showToast(friendlyMsg, "error");
+    } finally {
       setLoading(false);
+      setDemoLoggingIn(false);
     }
-  }
-
-  if (success) {
-    return (
-      <div className="login-page animate-fade">
-        <div
-          className="login-card animate-scale"
-          style={{ textAlign: "center", padding: "48px 24px" }}
-          role="status"
-          aria-live="polite"
-        >
-          <div style={{ display: "inline-flex", color: "#22c55e", marginBottom: "16px" }}>
-            <IconCheckCircle size={48} />
-          </div>
-          <h2 style={{ fontSize: "20px", fontWeight: 700, marginBottom: "8px" }}>
-            Account created
-          </h2>
-          <p className="text-muted" style={{ fontSize: "14px", marginBottom: "20px" }}>
-            Account created. Redirecting to dashboard...
-          </p>
-          <div style={{ display: "inline-flex", color: "var(--brand)" }}>
-            <IconSpinner size={24} />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!hasPaid) {
-    return (
-      <div className="login-page animate-fade">
-        <div className="login-card paywall-card animate-scale">
-          <div className="login-logo"><Logo /></div>
-
-          <div className="paywall-badge">
-            <IconShield size={14} /> Professional Workspace Tier
-          </div>
-
-          <h2 className="paywall-title">Activate your Workspace</h2>
-
-          <p className="paywall-subtitle text-muted">
-            To create a new company workspace on Praxis, please subscribe to the Professional plan.
-          </p>
-
-          <div className="paywall-price-badge">
-            <span className="paywall-price-amount">₹4,999</span>
-            <span className="paywall-price-period"> / month</span>
-          </div>
-
-          <div className="paywall-qr-container">
-            <div className="paywall-qr-box">
-              <img
-                src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=praxis@upi&pn=Praxis&am=4999"
-                alt="Praxis Subscription UPI QR Code"
-                width={200}
-                height={200}
-                className="paywall-qr-img"
-              />
-            </div>
-            <span className="paywall-qr-hint">Scan with any UPI app (GPay, PhonePe, Paytm)</span>
-          </div>
-
-          <button
-            type="button"
-            className="login-btn paywall-btn"
-            onClick={() => setHasPaid(true)}
-          >
-            <IconCheckCircle size={18} /> I have completed the payment
-          </button>
-
-          <p className="text-muted paywall-demo-link">
-            Just want to explore?{" "}
-            <button
-              type="button"
-              className="btn-link"
-              onClick={onSignIn}
-            >
-              Go back to Login
-            </button>{" "}
-            and use the Demo Account.
-          </p>
-        </div>
-      </div>
-    );
   }
 
   return (
     <div className="login-page animate-fade">
-      <div className="login-card animate-scale">
-        <div className="login-logo"><Logo /></div>
-        <p className="login-tagline">Create your Workspace (For Factories, Students, or Researchers)</p>
-
-        {/* Payment Verified Banner */}
-        <div className="payment-verified-banner animate-fade">
-          <span>✅ Payment Verified. Create your account below.</span>
-        </div>
-
-        <SocialLoginButtons
-          onSuccess={onSignup}
-          disabled={loading}
-        />
-
-        <form onSubmit={submit} className="login-form">
-          {error && (
-            <div className="login-error" role="alert">
-              <IconAlert size={16} />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <div className="login-field">
-            <label htmlFor="signup-company">Company / Organization / Workspace Name</label>
-            <input
-              id="signup-company"
-              type="text"
-              placeholder="e.g. Acme Labs or MIT Robotics"
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-              disabled={loading}
-              required={!inviteCode.trim()}
-              minLength={inviteCode.trim() ? undefined : 2}
-            />
-          </div>
-
-          <div className="login-field">
-            <label htmlFor="signup-invite-code">Have an Invite Code? (Optional)</label>
-            <input
-              id="signup-invite-code"
-              type="text"
-              placeholder="Paste invite code"
-              value={inviteCode}
-              onChange={(e) => setInviteCode(e.target.value)}
-              disabled={loading}
-            />
-            <small
-              style={{
-                fontSize: "11px",
-                color: "var(--text-muted)",
-                marginTop: "4px",
-                display: "block",
-                lineHeight: "1.4",
-              }}
-            >
-              Joining an existing team? Paste your code here. Creating a new team? Leave this blank.
-            </small>
-          </div>
-
-          <div className="login-field">
-            <label htmlFor="signup-role">Role</label>
-            <select
-              id="signup-role"
-              value={role}
-              onChange={(e) => setRole(e.target.value as UserRole)}
-              disabled={loading}
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                borderRadius: "var(--radius-sm)",
-                border: "1px solid var(--border-subtle)",
-                background: "var(--bg-elevated)",
-                color: "var(--text-main)",
-                fontSize: "14px",
-                outline: "none",
-              }}
-            >
-              <option value="technician">Technician</option>
-              <option value="maintenance_supervisor">Maintenance Supervisor</option>
-              <option value="production_supervisor">Production Supervisor</option>
-              <option value="plant_manager">Plant Manager</option>
-              <option value="business_owner">Business Owner</option>
-              <option value="explorer">Explorer</option>
-            </select>
-          </div>
-
-          <div className="login-field">
-            <label htmlFor="signup-email">Email</label>
-            <input
-              id="signup-email"
-              type="email"
-              autoComplete="email"
-              placeholder="operator@company.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={loading}
-              required
-            />
-          </div>
-
-          <div className="login-field">
-            <label htmlFor="signup-password">Password</label>
-            <input
-              id="signup-password"
-              type="password"
-              autoComplete="new-password"
-              minLength={12}
-              maxLength={128}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={loading}
-              required
-            />
-
-            {/* Password strength meter */}
-            <div className="password-meter-container" style={{ marginTop: "6px" }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: "4px",
-                }}
-              >
-                <small style={{ fontSize: "11px", color: "var(--text-muted)" }}>
-                  Password strength:
-                </small>
-                <span
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: 600,
-                    textTransform: "capitalize",
-                    color:
-                      password.length === 0
-                        ? "var(--text-muted)"
-                        : strength === "strong"
-                        ? "#22c55e"
-                        : strength === "medium"
-                        ? "#f59e0b"
-                        : "#ef4444",
-                  }}
-                >
-                  {password.length > 0 ? strength : "None"}
-                </span>
-              </div>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr 1fr",
-                  gap: "4px",
-                  height: "4px",
-                }}
-                aria-label={`Password strength: ${password.length > 0 ? strength : "none"}`}
-              >
-                <div
-                  style={{
-                    height: "100%",
-                    borderRadius: "2px",
-                    background:
-                      password.length === 0
-                        ? "var(--border-subtle)"
-                        : strength === "weak"
-                        ? "#ef4444"
-                        : strength === "medium"
-                        ? "#f59e0b"
-                        : "#22c55e",
-                    transition: "background 0.2s ease",
-                  }}
-                />
-                <div
-                  style={{
-                    height: "100%",
-                    borderRadius: "2px",
-                    background:
-                      strength === "medium"
-                        ? "#f59e0b"
-                        : strength === "strong"
-                        ? "#22c55e"
-                        : "var(--border-subtle)",
-                    transition: "background 0.2s ease",
-                  }}
-                />
-                <div
-                  style={{
-                    height: "100%",
-                    borderRadius: "2px",
-                    background: strength === "strong" ? "#22c55e" : "var(--border-subtle)",
-                    transition: "background 0.2s ease",
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Real-time validation feedback checklist */}
-            <div
-              className="password-checklist"
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "4px 8px",
-                marginTop: "8px",
-                padding: "8px 10px",
-                background: "var(--bg-elevated)",
-                borderRadius: "var(--radius-sm)",
-                fontSize: "11px",
-              }}
-              aria-label="Password requirements checklist"
-            >
-              {rules.map((rule) => (
-                <div
-                  key={rule.label}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    color: rule.met ? "#22c55e" : "var(--text-muted)",
-                    transition: "color 0.15s ease",
-                  }}
-                >
-                  <span style={{ fontWeight: "bold" }}>{rule.met ? "✓" : "○"}</span>
-                  <span>{rule.label}</span>
-                </div>
-              ))}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  color:
-                    confirm && confirm === password ? "#22c55e" : "var(--text-muted)",
-                  gridColumn: "1 / -1",
-                  transition: "color 0.15s ease",
-                }}
-              >
-                <span style={{ fontWeight: "bold" }}>
-                  {confirm && confirm === password ? "✓" : "○"}
-                </span>
-                <span>Passwords match</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="login-field">
-            <label htmlFor="signup-confirm">Confirm password</label>
-            <input
-              id="signup-confirm"
-              type="password"
-              autoComplete="new-password"
-              minLength={12}
-              maxLength={128}
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              disabled={loading}
-              required
-            />
-          </div>
-
+      <div className="login-card animate-scale" style={{ maxWidth: "480px" }}>
+        {onBack && (
           <button
-            type="submit"
-            className="login-btn"
-            disabled={
-              loading ||
-              (!inviteCode.trim() && (!companyName.trim() || companyName.trim().length < 2)) ||
-              !email.trim() ||
-              !allMet ||
-              password !== confirm
-            }
+            type="button"
+            className="login-back-btn"
+            onClick={onBack}
+            aria-label="Go back"
           >
-            {loading ? (
+            ← Back
+          </button>
+        )}
+        <div className="login-logo"><Logo /></div>
+        <p className="login-tagline">Start governing industrial AI with formal verification.</p>
+
+        {/* 1-Click Demo Bypass */}
+        <div className="demo-live-banner" style={{ marginBottom: "16px" }}>
+          <button
+            type="button"
+            className="demo-live-hero-btn"
+            onClick={() => void handleDemoLogin()}
+            disabled={loading}
+            aria-label="Use Demo Account for testing"
+            style={{
+              width: "100%",
+              padding: "12px 16px",
+              fontSize: "0.95rem",
+              fontWeight: 600,
+              background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: "8px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              boxShadow: "0 4px 12px rgba(16, 185, 129, 0.25)",
+            }}
+          >
+            {demoLoggingIn ? (
               <>
-                <IconSpinner size={16} /> Creating account…
+                <IconSpinner size={18} /> Entering Demo Mode…
               </>
             ) : (
-              "Create account"
+              "🚀 Use Demo Account (Bypass Clerk)"
             )}
           </button>
-        </form>
+        </div>
+
+        {/* Clerk Sign Up Component */}
+        {PUBLISHABLE_KEY ? (
+          <div className="clerk-auth-wrapper" style={{ width: "100%", display: "flex", justifyContent: "center" }}>
+            <SignUp
+              routing="hash"
+              appearance={clerkAppearance}
+            />
+          </div>
+        ) : (
+          <div
+            style={{
+              padding: "16px",
+              background: "rgba(30, 41, 59, 0.7)",
+              borderRadius: "8px",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
+              textAlign: "center",
+              margin: "12px 0",
+            }}
+          >
+            <p style={{ fontSize: "0.88rem", color: "#94a3b8", marginBottom: "12px" }}>
+              Clerk authentication enabled. Configure <code>VITE_CLERK_PUBLISHABLE_KEY</code> in your environment to load your live Clerk sign-up form.
+            </p>
+            <p style={{ fontSize: "0.85rem", color: "#38bdf8" }}>
+              Click <strong>&quot;Use Demo Account&quot;</strong> above to explore immediately.
+            </p>
+          </div>
+        )}
 
         <p className="text-muted" style={{ textAlign: "center", marginTop: "18px" }}>
           Already have an account?{" "}
           <button type="button" className="btn-link" onClick={onSignIn}>
-            Sign in
+            Sign In
           </button>
         </p>
       </div>

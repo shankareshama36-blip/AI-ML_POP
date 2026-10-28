@@ -24,6 +24,17 @@ DEMO_ACCOUNTS_ENABLED = os.getenv(
 DEFAULT_TIER1_MAX = 10_000.0
 DEFAULT_TIER2_MAX = 50_000.0
 
+# Clerk Authentication Configuration
+CLERK_SECRET_KEY = os.getenv("CLERK_SECRET_KEY", "")
+CLERK_PUBLISHABLE_KEY = os.getenv(
+    "CLERK_PUBLISHABLE_KEY",
+    os.getenv(
+        "VITE_CLERK_PUBLISHABLE_KEY",
+        os.getenv("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", ""),
+    ),
+)
+CLERK_WEBHOOK_SECRET = os.getenv("CLERK_WEBHOOK_SECRET", "")
+
 # Always include known production frontend origins so the app works
 # regardless of what ALLOWED_ORIGINS env var is set to on the host.
 _PRODUCTION_ORIGINS = [

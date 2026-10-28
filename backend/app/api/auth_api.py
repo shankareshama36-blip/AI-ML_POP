@@ -97,6 +97,7 @@ class UserResponse(BaseModel):
     tenant_id: str
     company_name: str
     is_admin: bool
+    clerk_user_id: str | None = None
 
 
 class AuthResponse(BaseModel):

@@ -1,6 +1,7 @@
 import logging
 import os
 from typing import Literal
+
 import google.generativeai as genai
 from fastapi import APIRouter, status
 from pydantic import BaseModel, ConfigDict, Field

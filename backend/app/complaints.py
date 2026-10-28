@@ -187,6 +187,10 @@ def attach_decision(
 def _assert_authorized_step(row: ComplaintWorkflow, role: str, action: str) -> None:
     if row.status in ("APPROVED", "REJECTED"):
         raise ValueError(f"Complaint is already in final state: {row.status}")
+    if role == "business_owner":
+        if row.status not in ("PENDING_MAINT", "PENDING_PROD", "PENDING_PLANT"):
+            raise ValueError(f"Role '{role}' cannot {action} a complaint in status '{row.status}'")
+        return
     expected_status = _ROLE_TO_STATUS.get(role)
     if expected_status is None or row.status != expected_status:
         raise ValueError(f"Role '{role}' cannot {action} a complaint in status '{row.status}'")

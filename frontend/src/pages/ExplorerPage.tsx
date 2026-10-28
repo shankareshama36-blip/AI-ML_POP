@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { analyzeExplorerDecision, type User } from "../api";
 import {
   IconSpinner,
@@ -74,19 +74,17 @@ export function ExplorerPage({ user, onLogout, onOpenSettings, onOpenChat }: Exp
   const [constraints, setConstraints] = useState("Budget: ₹1.5 Lakh, Deadline: 1 week");
   const [analyzing, setAnalyzing] = useState(false);
   const [currentResult, setCurrentResult] = useState<DecisionResult | null>(null);
-  const [decisionHistory, setDecisionHistory] = useState<DecisionResult[]>([]);
-
-  // Load history from localStorage on mount
-  useEffect(() => {
+  const [decisionHistory, setDecisionHistory] = useState<DecisionResult[]>(() => {
     try {
       const saved = localStorage.getItem("praxis-explorer-history");
       if (saved) {
-        setDecisionHistory(JSON.parse(saved) as DecisionResult[]);
+        return JSON.parse(saved) as DecisionResult[];
       }
     } catch {
       // Storage unavailable or invalid JSON
     }
-  }, []);
+    return [];
+  });
 
   function handleAddOption(e?: FormEvent) {
     if (e) e.preventDefault();

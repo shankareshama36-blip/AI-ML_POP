@@ -7,6 +7,7 @@ export interface User {
   tenant_id?: string;
   company_name?: string;
   is_admin?: boolean;
+  clerk_user_id?: string;
 }
 
 export interface ComplaintCreateInput {
@@ -219,7 +220,8 @@ export async function fetchWithTimeout(
   } catch (error: unknown) {
     if (error instanceof DOMException && error.name === "AbortError") {
       throw new Error(
-        `Request timed out after ${Math.round(timeoutMs / 1000)}s. The backend may be waking up (cold start). Please try again.`
+        `Request timed out after ${Math.round(timeoutMs / 1000)}s. The backend may be waking up (cold start). Please try again.`,
+        { cause: error }
       );
     }
     throw error;
@@ -238,8 +240,25 @@ export async function pingHealth(): Promise<boolean> {
   }
 }
 
+type TokenGetter = () => Promise<string | null>;
+let clerkTokenGetter: TokenGetter | null = null;
+
+export function setClerkTokenGetter(getter: TokenGetter | null) {
+  clerkTokenGetter = getter;
+}
+
 async function request<T>(path: string, options: RequestInit = {}, timeoutMs = 60000): Promise<T> {
-  const token = localStorage.getItem("praxis-token") ?? sessionStorage.getItem("praxis-token");
+  let token: string | null = null;
+  if (clerkTokenGetter) {
+    try {
+      token = await clerkTokenGetter();
+    } catch {
+      token = null;
+    }
+  }
+  if (!token) {
+    token = localStorage.getItem("praxis-token") ?? sessionStorage.getItem("praxis-token");
+  }
   const headers = new Headers(options.headers);
   headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
@@ -260,12 +279,26 @@ async function request<T>(path: string, options: RequestInit = {}, timeoutMs = 6
       if (!res.ok) {
         const body = await res.text();
         try {
-          const parsed = JSON.parse(body) as { detail?: string };
-          throw new ApiError(res.status, parsed.detail || body);
+          const parsed = JSON.parse(body) as { detail?: unknown };
+          let detailMessage = body;
+          if (typeof parsed.detail === "string") {
+            detailMessage = parsed.detail;
+          } else if (Array.isArray(parsed.detail) && parsed.detail.length > 0) {
+            const first = parsed.detail[0] as { msg?: string };
+            if (first && typeof first.msg === "string") {
+              detailMessage = first.msg.replace(/^Value error,\s*/i, "");
+            }
+          } else if (parsed.detail && typeof parsed.detail === "object" && "message" in parsed.detail) {
+            detailMessage = String((parsed.detail as { message: unknown }).message);
+          }
+          throw new ApiError(res.status, detailMessage || body);
         } catch (error) {
           if (error instanceof ApiError) throw error;
           throw new ApiError(res.status, body);
         }
+      }
+      if (res.status === 204) {
+        return undefined as T;
       }
       return (await res.json()) as T;
     } catch (err: unknown) {
@@ -370,43 +403,22 @@ export function logout(): void {
   sessionStorage.removeItem("am-pop-user");
 }
 
-function getAuthHeaders(): Record<string, string> {
-  const token = localStorage.getItem("praxis-token") ?? sessionStorage.getItem("praxis-token");
-  return token
-    ? { "Content-Type": "application/json", Authorization: `Bearer ${token}` }
-    : { "Content-Type": "application/json" };
-}
-
 export async function createComplaint(
   payload: ComplaintCreateInput,
   user: User
 ): Promise<Complaint> {
   void user;
-  const res = await fetchWithTimeout(`${BASE}/complaints`, {
+  return request<Complaint>("/complaints", {
     method: "POST",
-    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new ApiError(res.status, text);
-  }
-  return res.json();
 }
 
 export async function listComplaints(user: User): Promise<Complaint[]> {
   void user;
-  const res = await fetchWithTimeout(`${BASE}/complaints`, {
+  return request<Complaint[]>("/complaints", {
     method: "GET",
-    headers: getAuthHeaders(),
   });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new ApiError(res.status, text);
-  }
-  return res.json();
 }
 
 export async function getComplaint(
@@ -414,16 +426,9 @@ export async function getComplaint(
   user: User
 ): Promise<Complaint> {
   void user;
-  const res = await fetchWithTimeout(`${BASE}/complaints/${id}`, {
+  return request<Complaint>(`/complaints/${id}`, {
     method: "GET",
-    headers: getAuthHeaders(),
   });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new ApiError(res.status, text);
-  }
-  return res.json();
 }
 
 export async function evaluateComplaint(
@@ -431,16 +436,9 @@ export async function evaluateComplaint(
   user: User
 ): Promise<Complaint> {
   void user;
-  const res = await fetchWithTimeout(`${BASE}/complaints/${id}/evaluate`, {
+  return request<Complaint>(`/complaints/${id}/evaluate`, {
     method: "POST",
-    headers: getAuthHeaders(),
   });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new ApiError(res.status, text);
-  }
-  return res.json();
 }
 
 export async function approveComplaint(
@@ -449,17 +447,10 @@ export async function approveComplaint(
   comment: string = ""
 ): Promise<Complaint> {
   void user;
-  const res = await fetchWithTimeout(`${BASE}/complaints/${id}/approve`, {
+  return request<Complaint>(`/complaints/${id}/approve`, {
     method: "POST",
-    headers: getAuthHeaders(),
     body: JSON.stringify({ comment }),
   });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new ApiError(res.status, text);
-  }
-  return res.json();
 }
 
 export async function rejectComplaint(
@@ -468,53 +459,32 @@ export async function rejectComplaint(
   comment: string = ""
 ): Promise<Complaint> {
   void user;
-  const res = await fetchWithTimeout(`${BASE}/complaints/${id}/reject`, {
+  return request<Complaint>(`/complaints/${id}/reject`, {
     method: "POST",
-    headers: getAuthHeaders(),
     body: JSON.stringify({ comment }),
   });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new ApiError(res.status, text);
-  }
-  return res.json();
 }
 
 export async function evaluateDecision(
   input: DecisionInput
 ): Promise<DecisionResponse> {
-  const res = await fetchWithTimeout(`${BASE}/decisions/evaluate`, {
+  return request<DecisionResponse>("/decisions/evaluate", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new ApiError(res.status, text);
-  }
-  return res.json();
 }
 
 export async function approveDecision(
   decisionId: string,
   approverId: string
 ): Promise<DecisionResponse> {
-  const res = await fetchWithTimeout(`${BASE}/decisions/${decisionId}/approval`, {
+  return request<DecisionResponse>(`/decisions/${decisionId}/approval`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       status: "APPROVED",
       approver_id: approverId,
     }),
   });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new ApiError(res.status, text);
-  }
-  return res.json();
 }
 
 export async function getDecisionsCount(): Promise<number> {

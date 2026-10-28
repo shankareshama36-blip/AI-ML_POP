@@ -1,9 +1,9 @@
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect } from "react";
+import { SignIn } from "@clerk/clerk-react";
 import { login, pingHealth, type User } from "../api";
 import { IconSpinner } from "../components/Icons";
 import { Logo } from "../components/Logo";
 import { useToast, formatUserFriendlyError } from "../components/Toast";
-import { SocialLoginButtons } from "../components/SocialLoginButtons";
 
 interface LoginPageProps {
   onLogin: (user: User, token: string, persist?: boolean) => void;
@@ -19,47 +19,66 @@ const DEMO_ACCOUNTS = [
   { role: "Plant Manager", email: "plant@praxis.local", password: "Plant@12345!" },
 ];
 
-export function LoginPage({ onLogin, onBack, onSignup, onForgotPassword }: LoginPageProps) {
+const PUBLISHABLE_KEY =
+  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ||
+  import.meta.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ||
+  "";
+
+const clerkAppearance = {
+  variables: {
+    colorPrimary: "#2563eb",
+    colorBackground: "#0f172a",
+    colorText: "#f8fafc",
+    colorTextSecondary: "#94a3b8",
+    colorInputBackground: "#1e293b",
+    colorInputText: "#f8fafc",
+    borderRadius: "0.5rem",
+  },
+  elements: {
+    card: {
+      background: "#0f172a",
+      border: "1px solid #334155",
+      boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.5)",
+    },
+    headerTitle: {
+      color: "#f8fafc",
+    },
+    headerSubtitle: {
+      color: "#94a3b8",
+    },
+    socialButtonsBlockButton: {
+      border: "1px solid #334155",
+      background: "#1e293b",
+      color: "#f8fafc",
+      "&:hover": {
+        background: "#334155",
+      },
+    },
+    formButtonPrimary: {
+      background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+      "&:hover": {
+        background: "linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)",
+      },
+    },
+    footerActionLink: {
+      color: "#60a5fa",
+    },
+  },
+};
+
+export function LoginPage({ onLogin, onBack, onSignup }: LoginPageProps) {
   const { showToast } = useToast();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [isWakingUp, setIsWakingUp] = useState(false);
-  const [showDemo, setShowDemo] = useState(true);
+  const [showDemo, setShowDemo] = useState(false);
+  const [demoLoggingIn, setDemoLoggingIn] = useState(false);
 
   useEffect(() => {
-    // Ping backend when login page opens to warm up Render instance
     void pingHealth();
   }, []);
 
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    setLoading(true);
-    setIsWakingUp(false);
-    const wakeTimer = setTimeout(() => setIsWakingUp(true), 3500);
-
-    try {
-      const result = await login(email.trim(), password);
-      showToast(`Welcome back, ${result.user.email}!`, "success");
-      onLogin(result.user, result.token, remember);
-    } catch (err) {
-      console.error("Login failed:", err);
-      const friendlyMsg = formatUserFriendlyError(err);
-      showToast(friendlyMsg, "error");
-    } finally {
-      clearTimeout(wakeTimer);
-      setIsWakingUp(false);
-      setLoading(false);
-    }
-  }
-
   async function handleDemoLogin(demoEmail: string, demoPass: string) {
-    setEmail(demoEmail);
-    setPassword(demoPass);
     setLoading(true);
-    setIsWakingUp(false);
-    const wakeTimer = setTimeout(() => setIsWakingUp(true), 3500);
+    setDemoLoggingIn(true);
 
     try {
       const result = await login(demoEmail, demoPass, true);
@@ -70,26 +89,18 @@ export function LoginPage({ onLogin, onBack, onSignup, onForgotPassword }: Login
       const friendlyMsg = formatUserFriendlyError(err);
       showToast(friendlyMsg, "error");
     } finally {
-      clearTimeout(wakeTimer);
-      setIsWakingUp(false);
       setLoading(false);
-    }
-  }
-
-  const [demoLoggingIn, setDemoLoggingIn] = useState(false);
-
-  async function handleQuickDemo() {
-    setDemoLoggingIn(true);
-    try {
-      await handleDemoLogin("tech@praxis.local", "Tech@12345");
-    } finally {
       setDemoLoggingIn(false);
     }
   }
 
+  async function handleQuickDemo() {
+    await handleDemoLogin("tech@praxis.local", "Tech@12345!");
+  }
+
   return (
     <div className="login-page animate-fade">
-      <div className="login-card animate-scale">
+      <div className="login-card animate-scale" style={{ maxWidth: "480px" }}>
         {onBack && (
           <button
             type="button"
@@ -103,104 +114,70 @@ export function LoginPage({ onLogin, onBack, onSignup, onForgotPassword }: Login
         <div className="login-logo"><Logo /></div>
         <p className="login-tagline">AI can act. Praxis decides.</p>
 
-        <SocialLoginButtons
-          onSuccess={(user, token) => onLogin(user, token, remember)}
-          disabled={loading}
-        />
-
-        {/* 1-Click Live Demo Login */}
-        <div className="demo-live-banner">
+        {/* 1-Click Demo Account Bypass */}
+        <div className="demo-live-banner" style={{ marginBottom: "16px" }}>
           <button
             type="button"
             className="demo-live-hero-btn"
             onClick={() => void handleQuickDemo()}
             disabled={loading}
-            aria-label="Try the live demo free with pre-seeded demo account"
+            aria-label="Use Demo Account for testing"
+            style={{
+              width: "100%",
+              padding: "12px 16px",
+              fontSize: "0.95rem",
+              fontWeight: 600,
+              background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: "8px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              boxShadow: "0 4px 12px rgba(16, 185, 129, 0.25)",
+            }}
           >
             {demoLoggingIn ? (
               <>
-                <IconSpinner size={18} /> Entering Live Demo…
+                <IconSpinner size={18} /> Entering Demo Mode…
               </>
             ) : (
-              "🚀 Try the Live Demo (Free)"
+              "🚀 Use Demo Account (Bypass Clerk)"
             )}
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="login-form">
-          <div className="login-field">
-            <label htmlFor="login-email">Email</label>
-            <input
-              id="login-email"
-              type="email"
-              autoComplete="email"
-              placeholder="you@company.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={loading}
-              required
+        {/* Clerk Sign In Component */}
+        {PUBLISHABLE_KEY ? (
+          <div className="clerk-auth-wrapper" style={{ width: "100%", display: "flex", justifyContent: "center" }}>
+            <SignIn
+              routing="hash"
+              appearance={clerkAppearance}
             />
           </div>
-          <div className="login-field">
-            <label htmlFor="login-password">Password</label>
-            <input
-              id="login-password"
-              type="password"
-              autoComplete="current-password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={loading}
-              required
-            />
-          </div>
-          <div className="login-options">
-            <label className="form-check">
-              <input
-                type="checkbox"
-                checked={remember}
-                onChange={(e) => setRemember(e.target.checked)}
-              />
-              Remember me
-            </label>
-            {onForgotPassword && (
-              <button
-                type="button"
-                className="btn-link"
-                onClick={onForgotPassword}
-              >
-                Forgot password?
-              </button>
-            )}
-          </div>
-          <button
-            type="submit"
-            className="login-btn"
-            disabled={loading || !email.trim() || !password}
+        ) : (
+          <div
+            style={{
+              padding: "16px",
+              background: "rgba(30, 41, 59, 0.7)",
+              borderRadius: "8px",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
+              textAlign: "center",
+              margin: "12px 0",
+            }}
           >
-            {loading ? (
-              <>
-                <IconSpinner size={16} /> Signing in…
-              </>
-            ) : (
-              "Sign In"
-            )}
-          </button>
-          {isWakingUp && loading && (
-            <p
-              style={{
-                fontSize: "0.82rem",
-                color: "#64748b",
-                textAlign: "center",
-                marginTop: "10px",
-                lineHeight: "1.35",
-              }}
-            >
-              Connecting to backend… Free-tier instance is waking up (may take 20–45s).
+            <p style={{ fontSize: "0.88rem", color: "#94a3b8", marginBottom: "12px" }}>
+              Clerk authentication enabled. Configure <code>VITE_CLERK_PUBLISHABLE_KEY</code> in your environment to load your live Clerk login.
             </p>
-          )}
-        </form>
+            <p style={{ fontSize: "0.85rem", color: "#38bdf8" }}>
+              Click <strong>&quot;Use Demo Account&quot;</strong> above to explore the full dashboard instantly.
+            </p>
+          </div>
+        )}
 
+        {/* Demo Roles Toggle */}
         <div className="login-demo-toggle" style={{ marginTop: "16px", textAlign: "center" }}>
           <button
             type="button"
@@ -210,7 +187,7 @@ export function LoginPage({ onLogin, onBack, onSignup, onForgotPassword }: Login
             aria-controls="demo-accounts-panel"
             style={{ fontSize: "13px" }}
           >
-            {showDemo ? "Hide demo accounts ▲" : "Show demo accounts ▼"}
+            {showDemo ? "Hide demo accounts ▲" : "Select specific demo role ▼"}
           </button>
         </div>
 
@@ -232,7 +209,7 @@ export function LoginPage({ onLogin, onBack, onSignup, onForgotPassword }: Login
                 marginBottom: "8px",
               }}
             >
-              Click any account to sign in
+              Click any demo account to test
             </h4>
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
               {DEMO_ACCOUNTS.map((acc) => (
@@ -242,10 +219,10 @@ export function LoginPage({ onLogin, onBack, onSignup, onForgotPassword }: Login
                   className="demo-row"
                   onClick={() => void handleDemoLogin(acc.email, acc.password)}
                   disabled={loading}
-                  aria-label={`Sign in as the demo ${acc.role}`}
+                  aria-label={`Sign in as ${acc.role}`}
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "1.1fr 1.3fr 1fr",
+                    gridTemplateColumns: "1.1fr 1.3fr",
                     alignItems: "center",
                     gap: "6px",
                     width: "100%",
@@ -259,7 +236,6 @@ export function LoginPage({ onLogin, onBack, onSignup, onForgotPassword }: Login
                 >
                   <span className="role">{acc.role}</span>
                   <code>{acc.email}</code>
-                  <code style={{ color: "var(--text-muted)" }}>{acc.password}</code>
                 </button>
               ))}
             </div>
@@ -267,7 +243,7 @@ export function LoginPage({ onLogin, onBack, onSignup, onForgotPassword }: Login
         )}
 
         <p className="text-muted" style={{ textAlign: "center", marginTop: "18px" }}>
-          New to Praxis?{" "}
+          Don&apos;t have an account?{" "}
           <button type="button" className="btn-link" onClick={onSignup}>
             Create an account
           </button>

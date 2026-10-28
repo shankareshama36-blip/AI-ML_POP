@@ -63,52 +63,34 @@ const SUGGESTED_PROMPTS = [
   "What if budget was higher?",
 ];
 
+function loadSavedChatContext(): SavedChatContext | null {
+  try {
+    const raw = localStorage.getItem("praxis-chat-context");
+    if (raw) {
+      return JSON.parse(raw) as SavedChatContext;
+    }
+  } catch {
+    // Ignore storage or parse errors
+  }
+  return null;
+}
+
 export function ChatPage({ user, onBack, onLogout }: ChatPageProps) {
   const { showToast } = useToast();
-  const [messages, setMessages] = useState<ChatMessageInput[]>([]);
+  const [decisionContext] = useState<SavedChatContext | null>(() => loadSavedChatContext());
+  const [messages, setMessages] = useState<ChatMessageInput[]>(() => {
+    const ctx = loadSavedChatContext();
+    const greeting = ctx?.title
+      ? `Hello! I am Praxis, your AI decision assistant. I have your context ready for "${ctx.title}". How can I help you explore or refine this decision?`
+      : "Hello! I am Praxis, your AI decision assistant. How can I help you today?";
+    return [{ role: "assistant", content: greeting }];
+  });
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [decisionContext, setDecisionContext] = useState<SavedChatContext | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
-
-  // Initialize context and greeting from localStorage
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("praxis-chat-context");
-      if (raw) {
-        const parsed = JSON.parse(raw) as SavedChatContext;
-        setDecisionContext(parsed);
-
-        const greeting = parsed.title
-          ? `Hello! I am Praxis, your AI decision assistant. I have your context ready for "${parsed.title}". How can I help you explore or refine this decision?`
-          : "Hello! I am Praxis, your AI decision assistant. How can I help you today?";
-
-        setMessages([
-          {
-            role: "assistant",
-            content: greeting,
-          },
-        ]);
-      } else {
-        setMessages([
-          {
-            role: "assistant",
-            content: "Hello! I am Praxis, your AI decision assistant. How can I help you today?",
-          },
-        ]);
-      }
-    } catch {
-      setMessages([
-        {
-          role: "assistant",
-          content: "Hello! I am Praxis, your AI decision assistant. How can I help you today?",
-        },
-      ]);
-    }
-  }, []);
 
   // Auto-scroll to bottom of messages
   useEffect(() => {

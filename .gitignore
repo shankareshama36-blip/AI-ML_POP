@@ -3,6 +3,8 @@ __pycache__/
 .pytest_cache/
 .env
 .env.*
+!.env.example
+!frontend/.env.example
 !.env.production
 node_modules/
 dist/

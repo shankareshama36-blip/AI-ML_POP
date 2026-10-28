@@ -18,7 +18,6 @@ from backend.app.complaints import (
     create_complaint,
     get_complaint,
     list_complaints,
-    list_complaints_for_role,
     reject_complaint,
 )
 from backend.app.core.rate_limit import limiter
@@ -27,7 +26,7 @@ from backend.app.formal_engine import MaintenanceRequest
 from backend.app.models import MachineState, MachineStatus, OperationalConstraints
 
 router = APIRouter(prefix="/complaints", tags=["complaints"])
-_APPROVER_ROLES = {"maintenance_supervisor", "production_supervisor", "plant_manager"}
+_APPROVER_ROLES = {"maintenance_supervisor", "production_supervisor", "plant_manager", "business_owner"}
 _SUBMITTER_ROLES = {"technician", "explorer", "creator", "researcher", "business_owner"}
 _EVALUATOR_ROLES = {"maintenance_supervisor", "business_owner", "plant_manager"}
 CurrentUser = Annotated[dict[str, object], Depends(get_current_user)]
@@ -75,10 +74,8 @@ def get_complaints(current_user: CurrentUser) -> list[ComplaintRecord]:
     role = str(current_user["role"])
     if role in {"technician", "explorer", "creator", "researcher"}:
         return list_complaints(tenant_id=_tenant(current_user), submitted_by=str(current_user["email"]))
-    if role == "business_owner":
-        return list_complaints(tenant_id=_tenant(current_user))
     _require_role(current_user, _APPROVER_ROLES)
-    return list_complaints_for_role(role, tenant_id=_tenant(current_user))
+    return list_complaints(tenant_id=_tenant(current_user))
 
 
 @router.get("/{complaint_id}", response_model=ComplaintRecord)

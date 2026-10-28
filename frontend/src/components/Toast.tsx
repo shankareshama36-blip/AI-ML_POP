@@ -19,6 +19,7 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 
 let globalShowToast: ((message: string, type?: ToastType) => void) | null = null;
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function triggerToast(message: string, type: ToastType = "error") {
   if (globalShowToast) {
     globalShowToast(message, type);
@@ -27,6 +28,7 @@ export function triggerToast(message: string, type: ToastType = "error") {
   }
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function formatUserFriendlyError(err: unknown): string {
   if (!err) return "An unexpected error occurred.";
 
@@ -201,6 +203,7 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useToast() {
   const ctx = useContext(ToastContext);
   if (!ctx) {

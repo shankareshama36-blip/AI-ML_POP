@@ -173,6 +173,10 @@ export function TechnicianPage({ user, onLogout, onOpenSettings }: TechnicianPag
     }
   }
 
+  const [selectedComplaintId, setSelectedComplaintId] = useState<string | null>(null);
+  const selectedComplaint = complaints.find((c) => c.complaint_id === selectedComplaintId) || complaints[0] || null;
+  const formattedRole = user.role.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
   return (
     <div className="app-shell animate-fade">
       {/* Top App Bar */}
@@ -181,14 +185,14 @@ export function TechnicianPage({ user, onLogout, onOpenSettings }: TechnicianPag
           <div className="app-logo">
             <Logo />
           </div>
-          <span className="role-badge">Technician</span>
+          <span className="role-badge">{formattedRole}</span>
         </div>
         <div className="app-bar-right">
           <div className="user-chip">
             <div className="user-avatar">{user.email.slice(0, 1)}</div>
             <span>{user.email}</span>
           </div>
-          {(user.role === "plant_manager" || Boolean(user.is_admin)) && onOpenSettings && (
+          {(user.role === "plant_manager" || user.role === "business_owner" || Boolean(user.is_admin)) && onOpenSettings && (
             <button
               type="button"
               className="action-btn secondary"
@@ -253,59 +257,117 @@ export function TechnicianPage({ user, onLogout, onOpenSettings }: TechnicianPag
                 <p className="empty-state-subtitle">Submit a machine issue from the panel to initiate an automated evaluation.</p>
               </div>
             ) : (
-              <div className="table-responsive">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Machine &amp; Issue</th>
-                      <th>Severity</th>
-                      <th>AI Decision</th>
-                      <th>Status</th>
-                      <th>Submitted</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {complaints.map((item) => (
-                      <tr key={item.complaint_id} className="data-table-row">
-                        <td>
-                          <div className="table-cell-title">
-                            {item.machine_id} — {item.problem_type}
-                          </div>
-                          <div className="table-cell-sub">
-                            #{item.complaint_id.slice(0, 8)}
-                            {item.notes ? ` · ${item.notes}` : ""}
-                          </div>
-                        </td>
-                        <td>
-                          <span className="severity-badge" data-sev={item.severity}>
-                            {item.severity}
-                          </span>
-                        </td>
-                        <td>
-                          {item.decision ? (
-                            <div className="decision-cell-inline">
-                              <span className="decision-action-tag">
-                                {item.decision.recommended_action_id}
-                              </span>
-                              <span className="decision-cost-tag">
-                                ₹{Number(item.decision.expected_cost || 0).toLocaleString()}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-muted" style={{ fontSize: "12px" }}>Awaiting AI</span>
-                          )}
-                        </td>
-                        <td>
-                          <StatusBadge status={item.status} />
-                        </td>
-                        <td className="text-muted" style={{ fontSize: "12px", whiteSpace: "nowrap" }}>
-                          {new Date(item.submitted_at).toLocaleDateString()}
-                        </td>
+              <>
+                <div className="table-responsive">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Machine &amp; Issue</th>
+                        <th>Severity</th>
+                        <th>AI Decision</th>
+                        <th>Status</th>
+                        <th>Submitted</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {complaints.map((item) => {
+                        const isSelected = selectedComplaint?.complaint_id === item.complaint_id;
+                        return (
+                          <tr
+                            key={item.complaint_id}
+                            className={`data-table-row ${isSelected ? "selected" : ""}`}
+                            onClick={() => setSelectedComplaintId(item.complaint_id)}
+                            style={{
+                              cursor: "pointer",
+                              background: isSelected ? "var(--brand-soft)" : undefined,
+                            }}
+                          >
+                            <td>
+                              <div className="table-cell-title">
+                                {item.machine_id} — {item.problem_type}
+                              </div>
+                              <div className="table-cell-sub">
+                                #{item.complaint_id.slice(0, 8)}
+                                {item.notes ? ` · ${item.notes}` : ""}
+                              </div>
+                            </td>
+                            <td>
+                              <span className="severity-badge" data-sev={item.severity}>
+                                {item.severity}
+                              </span>
+                            </td>
+                            <td>
+                              {item.decision ? (
+                                <div className="decision-cell-inline">
+                                  <span className="decision-action-tag">
+                                    {item.decision.recommended_action_id}
+                                  </span>
+                                  <span className="decision-cost-tag">
+                                    ₹{Number(item.decision.expected_cost || 0).toLocaleString()}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-muted" style={{ fontSize: "12px" }}>Awaiting AI</span>
+                              )}
+                            </td>
+                            <td>
+                              <StatusBadge status={item.status} />
+                            </td>
+                            <td className="text-muted" style={{ fontSize: "12px", whiteSpace: "nowrap" }}>
+                              {new Date(item.submitted_at).toLocaleDateString()}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {selectedComplaint && (
+                  <div
+                    style={{
+                      marginTop: "16px",
+                      padding: "16px",
+                      borderRadius: "var(--radius-md)",
+                      background: "var(--bg-elevated)",
+                      border: "1px solid var(--border-subtle)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: "12px",
+                        marginBottom: "8px",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <strong style={{ fontSize: "14px", color: "var(--text-primary)" }}>
+                        {selectedComplaint.machine_id} · {selectedComplaint.problem_type}
+                      </strong>
+                      <StatusBadge status={selectedComplaint.status} />
+                    </div>
+                    {selectedComplaint.decision ? (
+                      <div style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                        <div style={{ marginBottom: "6px" }}>
+                          <strong>Recommended Action:</strong> {selectedComplaint.decision.recommended_action_id} ·{" "}
+                          <strong>Est. Cost:</strong> ₹{Number(selectedComplaint.decision.expected_cost || 0).toLocaleString()} ·{" "}
+                          <strong>Downtime:</strong> {selectedComplaint.decision.expected_downtime}h ·{" "}
+                          <strong>Confidence:</strong> {Math.round(Number(selectedComplaint.decision.confidence || 0) * 100)}%
+                        </div>
+                        {selectedComplaint.decision.reason && (
+                          <div style={{ color: "var(--text-muted)" }}>{selectedComplaint.decision.reason}</div>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>
+                        Awaiting supervisor AI evaluation. Switch to Maintenance Supervisor to run the AI Decision Engine.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
 

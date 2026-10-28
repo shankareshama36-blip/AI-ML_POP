@@ -19,6 +19,7 @@ dependencies = [
     "bcrypt",
     "python-jose[cryptography]",
     "google-generativeai",
+    "clerk-backend-api",
 ]
 
 [project.optional-dependencies]
