@@ -35,7 +35,7 @@ const DEMO_ROLES: Array<{ label: string; email: string; password: string; role: 
 const PUBLISHABLE_KEY =
   import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ||
   import.meta.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ||
-  "";
+  "pk_test_Y3Jpc3AtdHJvbGwtNDc5Ni5jbGVyay5hY2NvdW50cy5kZXYk";
 
 function ClerkSessionListener({ onSync }: { onSync: (user: User) => void }) {
   const { getToken, userId, isSignedIn } = useAuth();

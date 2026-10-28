@@ -16,12 +16,21 @@ services:
         value: production
       - key: ENABLE_DEMO_ACCOUNTS
         value: "true"
+      - key: CLERK_PUBLISHABLE_KEY
+        value: "pk_test_Y3Jpc3AtdHJvbGwtNDc5Ni5jbGVyay5hY2NvdW50cy5kZXYk"
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: CLERK_WEBHOOK_SECRET
+        sync: false
 
   - type: web
     name: praxis-frontend
     runtime: static
     buildCommand: "cd frontend && npm ci && npm run build"
     staticPublishPath: "frontend/dist"
+    envVars:
+      - key: VITE_CLERK_PUBLISHABLE_KEY
+        value: "pk_test_Y3Jpc3AtdHJvbGwtNDc5Ni5jbGVyay5hY2NvdW50cy5kZXYk"
     routes:
       - type: rewrite
         source: /*
