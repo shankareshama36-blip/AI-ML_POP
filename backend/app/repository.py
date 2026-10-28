@@ -42,20 +42,41 @@ class DecisionRepository:
             self._decisions[workflow.decision.decision_id] = workflow
             return workflow.model_copy(deep=True)
 
-    def get(self, decision_id: UUID) -> DecisionWorkflowResponse:
+    def get(
+        self, decision_id: UUID, tenant_id: str | None = None
+    ) -> DecisionWorkflowResponse:
         with self._lock:
             try:
-                return self._decisions[decision_id].model_copy(deep=True)
+                workflow = self._decisions[decision_id]
+                if tenant_id and workflow.tenant_id and str(workflow.tenant_id) != str(tenant_id):
+                    raise DecisionNotFoundError(
+                        f"Decision {decision_id} was not found"
+                    )
+                return workflow.model_copy(deep=True)
             except KeyError as error:
                 raise DecisionNotFoundError(
                     f"Decision {decision_id} was not found"
                 ) from error
 
     def update_approval(
-        self, decision_id: UUID, update: ApprovalUpdate
+        self,
+        decision_id: UUID,
+        update: ApprovalUpdate,
+        tenant_id: str | None = None,
+        approver_email: str | None = None,
     ) -> DecisionWorkflowResponse:
         with self._lock:
             workflow = self._get_internal(decision_id)
+            if tenant_id and workflow.tenant_id and str(workflow.tenant_id) != str(tenant_id):
+                raise DecisionNotFoundError(
+                    f"Decision {decision_id} was not found"
+                )
+            if (
+                approver_email
+                and workflow.submitted_by
+                and approver_email.strip().lower() == workflow.submitted_by.strip().lower()
+            ):
+                raise DecisionLifecycleError("Submitter cannot approve own decision")
             if workflow.outcome is not None:
                 raise DecisionLifecycleError(
                     "A completed decision cannot be re-approved"
@@ -78,10 +99,17 @@ class DecisionRepository:
             return updated.model_copy(deep=True)
 
     def record_outcome(
-        self, decision_id: UUID, outcome_input: OutcomeCreate
+        self,
+        decision_id: UUID,
+        outcome_input: OutcomeCreate,
+        tenant_id: str | None = None,
     ) -> DecisionWorkflowResponse:
         with self._lock:
             workflow = self._get_internal(decision_id)
+            if tenant_id and workflow.tenant_id and str(workflow.tenant_id) != str(tenant_id):
+                raise DecisionNotFoundError(
+                    f"Decision {decision_id} was not found"
+                )
             if workflow.approval.status is not ApprovalStatus.APPROVED:
                 raise DecisionLifecycleError(
                     "Only an approved decision can have an execution outcome"
@@ -95,10 +123,12 @@ class DecisionRepository:
             self._experiences.append(self._experience_from(updated, outcome))
             return updated.model_copy(deep=True)
 
-    def list_experiences(self) -> list[Experience]:
+    def list_experiences(self, tenant_id: str | None = None) -> list[Experience]:
         with self._lock:
             return [
-                experience.model_copy(deep=True) for experience in self._experiences
+                experience.model_copy(deep=True)
+                for experience in self._experiences
+                if not tenant_id or not experience.tenant_id or str(experience.tenant_id) == str(tenant_id)
             ]
 
     def total_decisions_count(self) -> int:
@@ -142,4 +172,5 @@ class DecisionRepository:
                 "cost_delta": round(outcome.actual_cost - decision.expected_cost, 2),
             },
             outcome=outcome,
+            tenant_id=workflow.tenant_id,
         )

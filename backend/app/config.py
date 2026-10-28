@@ -12,7 +12,7 @@ if not _jwt_secret:
 
 JWT_SECRET = _jwt_secret
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRE_HOURS = 168  # 7 days
+JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "168"))  # Default: 7 days
 
 DEMO_ACCOUNTS_ENABLED = os.getenv(
     "ENABLE_DEMO_ACCOUNTS",

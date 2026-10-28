@@ -22,6 +22,7 @@ from backend.app.auth_real import (
     validate_password,
     verify_password,
 )
+from backend.app.config import DEMO_ACCOUNTS_ENABLED, ENV
 from backend.app.db import PasswordResetToken, SessionLocal, Tenant, User, create_tenant
 
 limiter = Limiter(key_func=get_remote_address)
@@ -135,8 +136,10 @@ def _token_hash(token: str) -> str:
 
 def _signup_rate_limit_key(request: Request) -> str:
     if (
-        request.headers.get("x-demo-login") == "true"
-        or request.query_params.get("demo") == "true"
+        (DEMO_ACCOUNTS_ENABLED and ENV != "production" and (
+            request.headers.get("x-demo-login") == "true"
+            or request.query_params.get("demo") == "true"
+        ))
         or os.getenv("TESTING") == "true"
         or os.getenv("PYTEST_CURRENT_TEST")
     ):
@@ -190,23 +193,24 @@ def signup(request: Request, payload: SignupRequest) -> AuthResponse:
 
 
 def _login_rate_limit_key(request: Request) -> str:
-    """Bypass rate limiting for demo account logins so demonstration flows are not throttled."""
-    if (
-        request.headers.get("x-demo-login") == "true"
-        or request.query_params.get("demo") == "true"
-    ):
-        return f"demo-{secrets.token_hex(8)}"
-    raw = getattr(request.state, "raw_body", b"")
-    if raw:
-        try:
-            import json
+    """Bypass rate limiting for demo account logins in development/demo environments so demonstration flows are not throttled."""
+    if DEMO_ACCOUNTS_ENABLED and ENV != "production":
+        if (
+            request.headers.get("x-demo-login") == "true"
+            or request.query_params.get("demo") == "true"
+        ):
+            return f"demo-{secrets.token_hex(8)}"
+        raw = getattr(request.state, "raw_body", b"")
+        if raw:
+            try:
+                import json
 
-            data = json.loads(raw.decode())
-            email = str(data.get("email", "")).strip().lower()
-            if email in DEMO_ALIASES or email in LEGACY_DEMO_PASSWORDS or email.endswith("@praxis.local") or email.endswith("@ampop.local"):
-                return f"demo-{secrets.token_hex(8)}"
-        except Exception:
-            pass
+                data = json.loads(raw.decode())
+                email = str(data.get("email", "")).strip().lower()
+                if email in DEMO_ALIASES or email in LEGACY_DEMO_PASSWORDS or email.endswith("@praxis.local") or email.endswith("@ampop.local"):
+                    return f"demo-{secrets.token_hex(8)}"
+            except Exception:
+                pass
     return get_remote_address(request)
 
 
@@ -253,35 +257,13 @@ def login(request: Request, payload: LoginRequest) -> AuthResponse:
         return _auth_response(user)
 
 
-@router.post("/auth/social-login", response_model=AuthResponse)
-@limiter.limit("60/minute")
-def social_login(request: Request, payload: SocialLoginRequest) -> AuthResponse:
-    email = payload.email.strip().lower()
-    provider_clean = payload.provider.strip().lower()
-    with SessionLocal() as session:
-        user = session.query(User).filter_by(email=email).first()
-        if user is None:
-            display_name = payload.name.strip() if payload.name and payload.name.strip() else provider_clean.capitalize()
-            workspace_name = f"{display_name}'s Workspace"
-            tenant = create_tenant(session, workspace_name)
-
-            random_password = f"OAuth-{secrets.token_urlsafe(24)}!9a"
-            pwd_hash = hash_password(random_password)
-
-            user = User(
-                email=email,
-                password_hash=pwd_hash,
-                role="business_owner",
-                tenant_id=tenant.id,
-                company_name=tenant.name,
-                is_admin=True,
-            )
-            session.add(user)
-            session.flush()
-
-        response = _auth_response(user)
-        session.commit()
-        return response
+@router.post("/auth/social-login", status_code=status.HTTP_410_GONE, deprecated=True)
+def social_login() -> dict[str, str]:
+    """Deprecated endpoint: Social and OAuth logins are managed exclusively by Clerk."""
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="Social login endpoint is deprecated. OAuth is handled exclusively by Clerk.",
+    )
 
 
 @router.post("/auth/forgot-password", response_model=ForgotPasswordResponse)

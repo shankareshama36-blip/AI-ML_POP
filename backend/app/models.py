@@ -159,6 +159,7 @@ class Experience(ContractModel):
     decision_taken: dict[str, Any]
     prediction_accuracy: dict[str, float]
     outcome: Outcome
+    tenant_id: str | None = None
 
 
 class DecisionWorkflowResponse(ContractModel):
@@ -175,3 +176,5 @@ class DecisionWorkflowResponse(ContractModel):
     decision: DecisionResult
     approval: Approval
     outcome: Outcome | None = None
+    tenant_id: str | None = None
+    submitted_by: str | None = None

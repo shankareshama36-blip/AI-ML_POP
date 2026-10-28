@@ -1,14 +1,19 @@
 import logging
 import os
-from typing import Literal
+from typing import Annotated, Literal
 
 import google.generativeai as genai
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, Request, status
 from pydantic import BaseModel, ConfigDict, Field
+
+from backend.app.auth_real import get_current_user
+from backend.app.core.rate_limit import limiter
+from backend.app.db import User
 
 logger = logging.getLogger("praxis.explorer")
 
 router = APIRouter(tags=["explorer"])
+CurrentUser = Annotated[dict[str, object], Depends(get_current_user)]
 
 PRAXIS_SYSTEM_INSTRUCTION = (
     "You are the Praxis AI Engine. Answer the user's decision problem directly. "
@@ -206,7 +211,12 @@ def _generate_fallback_chat_reply(last_user_message: str, ctx: dict[str, str]) -
     response_model=ExplorerAnalyzeResponse,
     status_code=status.HTTP_200_OK,
 )
-def analyze_decision(payload: ExplorerAnalyzeRequest) -> ExplorerAnalyzeResponse:
+@limiter.limit("5/minute")
+def analyze_decision(
+    request: Request,
+    payload: ExplorerAnalyzeRequest,
+    current_user: User = Depends(get_current_user),
+) -> ExplorerAnalyzeResponse:
     title = payload.title.strip()
     options = [opt.strip() for opt in payload.options if opt.strip()]
     constraints = payload.constraints.strip()
@@ -262,7 +272,12 @@ def analyze_decision(payload: ExplorerAnalyzeRequest) -> ExplorerAnalyzeResponse
     response_model=ExplorerChatResponse,
     status_code=status.HTTP_200_OK,
 )
-def chat_decision(payload: ExplorerChatRequest) -> ExplorerChatResponse:
+@limiter.limit("5/minute")
+def chat_decision(
+    request: Request,
+    payload: ExplorerChatRequest,
+    current_user: User = Depends(get_current_user),
+) -> ExplorerChatResponse:
     if not payload.messages:
         return ExplorerChatResponse(
             reply="Please provide a message to chat with Praxis.",

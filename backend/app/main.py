@@ -12,13 +12,13 @@ from backend.app.api.complaints_api import router as complaints_router
 from backend.app.api.explorer_api import router as explorer_router
 from backend.app.api.settings_api import router as settings_router
 from backend.app.api.webhooks import router as webhooks_router
-from backend.app.auth_real import get_current_user
+from backend.app.auth_real import get_current_user, require_role
 from backend.app.core.rate_limit import (
     limiter,
     rate_limit_exceeded_handler,
 )
 from backend.app.core.security import SecurityHeadersMiddleware
-from backend.app.db import ComplaintWorkflow, SessionLocal, init_db
+from backend.app.db import ComplaintWorkflow, SessionLocal, User, init_db
 from backend.app.decision_engine import NoFeasibleActionError, evaluate_decision
 from backend.app.formal_engine import (
     DfaValidationResult,
@@ -57,8 +57,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Demo-Login"],
 )
 app.add_middleware(SecurityHeadersMiddleware)
 
@@ -115,6 +115,19 @@ def validate_maintenance_request_endpoint(
     return validate_maintenance_request(payload)
 
 
+_APPROVER_ROLES = {"maintenance_supervisor", "production_supervisor", "plant_manager", "manager"}
+
+
+def _require_role(current_user: dict[str, object], allowed: set[str]) -> str:
+    role = str(current_user.get("role", "")).lower()
+    if role not in allowed:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Role is not authorised for this action.",
+        )
+    return role
+
+
 @app.post(
     "/decisions/evaluate",
     response_model=DecisionWorkflowResponse,
@@ -166,6 +179,8 @@ def evaluate_maintenance_decision(
         optimization=artifacts.optimization,
         decision=artifacts.decision,
         approval=pending_approval,
+        tenant_id=str(current_user.get("tenant_id", "")),
+        submitted_by=str(current_user.get("email", "")),
     )
     return decision_repository.create(workflow)
 
@@ -178,7 +193,7 @@ def get_decision(
     """Retrieve a decision and its immutable stage-by-stage audit trail."""
 
     try:
-        return decision_repository.get(decision_id)
+        return decision_repository.get(decision_id, tenant_id=str(current_user.get("tenant_id", "")))
     except DecisionNotFoundError as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(error)
@@ -188,12 +203,20 @@ def get_decision(
 @app.post("/decisions/{decision_id}/approval", response_model=DecisionWorkflowResponse)
 @limiter.limit("60/minute")
 def update_decision_approval(
-    request: Request, decision_id: UUID, payload: ApprovalUpdate, current_user: CurrentUser
+    request: Request,
+    decision_id: UUID,
+    payload: ApprovalUpdate,
+    current_user: User = Depends(
+        require_role(["maintenance_supervisor", "production_supervisor", "plant_manager", "business_owner"])
+    ),
 ) -> DecisionWorkflowResponse:
     """Record the manager's human-in-the-loop decision."""
-
+    tenant_id = str(current_user.get("tenant_id", ""))
+    approver_email = str(current_user.get("email", ""))
     try:
-        return decision_repository.update_approval(decision_id, payload)
+        return decision_repository.update_approval(
+            decision_id, payload, tenant_id=tenant_id, approver_email=approver_email
+        )
     except DecisionNotFoundError as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(error)
@@ -207,12 +230,19 @@ def update_decision_approval(
 @app.post("/decisions/{decision_id}/outcome", response_model=DecisionWorkflowResponse)
 @limiter.limit("60/minute")
 def record_decision_outcome(
-    request: Request, decision_id: UUID, payload: OutcomeCreate, current_user: CurrentUser
+    request: Request,
+    decision_id: UUID,
+    payload: OutcomeCreate,
+    current_user: User = Depends(
+        require_role(["maintenance_supervisor", "production_supervisor", "plant_manager", "business_owner"])
+    ),
 ) -> DecisionWorkflowResponse:
     """Record execution results and add an experience-memory entry."""
-
+    tenant_id = str(current_user.get("tenant_id", ""))
     try:
-        return decision_repository.record_outcome(decision_id, payload)
+        return decision_repository.record_outcome(
+            decision_id, payload, tenant_id=tenant_id
+        )
     except DecisionNotFoundError as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(error)
@@ -228,4 +258,4 @@ def record_decision_outcome(
 def list_experiences(request: Request, current_user: CurrentUser) -> list[Experience]:
     """Return completed decisions available to future learning stages."""
 
-    return decision_repository.list_experiences()
+    return decision_repository.list_experiences(tenant_id=str(current_user.get("tenant_id", "")))

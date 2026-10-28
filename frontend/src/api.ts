@@ -369,17 +369,6 @@ export async function login(email: string, password: string, isDemo = false): Pr
   });
 }
 
-export async function socialLogin(
-  provider: string,
-  email: string,
-  name?: string
-): Promise<AuthResult> {
-  return request<AuthResult>("/auth/social-login", {
-    method: "POST",
-    body: JSON.stringify({ provider, email, name }),
-  });
-}
-
 export async function requestPasswordReset(email: string): Promise<{ message: string; reset_token?: string }> {
   return request("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email: email.trim() }) });
 }

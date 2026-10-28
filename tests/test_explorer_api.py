@@ -1,8 +1,37 @@
+from uuid import UUID
+
 from fastapi.testclient import TestClient
 
+from backend.app.auth_real import create_jwt, hash_password
+from backend.app.db import SessionLocal, User, init_db
 from backend.app.main import app
 
-client = TestClient(app)
+init_db()
+with SessionLocal() as session:
+    user = session.query(User).filter_by(email="explorer-test@praxis.local").first()
+    if user is None:
+        user = User(
+            email="explorer-test@praxis.local",
+            password_hash=hash_password("StrongTestPassword1"),
+            role="explorer",
+            tenant_id=UUID("00000000-0000-0000-0000-000000000000"),
+            company_name="Test Company",
+        )
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+    token = create_jwt(user.id, user.role, user.tenant_id)
+
+client = TestClient(app, headers={"Authorization": f"Bearer {token}"})
+unauth_client = TestClient(app)
+
+
+def test_explorer_unauthenticated_returns_401() -> None:
+    res1 = unauth_client.post("/explorer/analyze", json={"title": "T", "options": ["A", "B"], "constraints": "C"})
+    assert res1.status_code == 401
+
+    res2 = unauth_client.post("/explorer/chat", json={"messages": [{"role": "user", "content": "hi"}]})
+    assert res2.status_code == 401
 
 
 def test_explorer_analyze_mock_fallback() -> None:
@@ -92,6 +121,7 @@ def test_explorer_chat_specific_followup_why_not() -> None:
 
 
 def test_explorer_chat_suggested_prompts() -> None:
+    app.state.limiter.reset()
     prompts = [
         ("Why was this chosen?", "MacBook Air M3"),
         ("Compare top 2 options", "Comparing"),

@@ -152,6 +152,7 @@ def test_cors_headers() -> None:
     )
     assert res.headers.get("access-control-allow-origin") == "http://localhost:5173"
     assert res.headers.get("access-control-allow-credentials") == "true"
+    assert "GET" in res.headers.get("access-control-allow-methods", "")
 
 
 def test_decisions_count_endpoint() -> None:
@@ -222,29 +223,12 @@ def test_forgot_password_with_demo_alias() -> None:
 
 def test_social_login() -> None:
     init_db()
-    # 1. New social user signup
-    oauth_email = f"oauth-{uuid4().hex[:8]}@example.com"
     res = client.post(
         "/auth/social-login",
-        json={"provider": "google", "email": oauth_email, "name": "Google User"},
+        json={"provider": "google", "email": "test@example.com"},
     )
-    assert res.status_code == 200
-    data = res.json()
-    assert "token" in data
-    assert data["user"]["email"] == oauth_email
-    assert data["user"]["role"] == "business_owner"
-    assert data["user"]["is_admin"] is True
-    assert "tenant_id" in data["user"]
-
-    # 2. Existing social user login returns same user & tenant
-    res2 = client.post(
-        "/auth/social-login",
-        json={"provider": "google", "email": oauth_email, "name": "Google User"},
-    )
-    assert res2.status_code == 200
-    data2 = res2.json()
-    assert data2["user"]["id"] == data["user"]["id"]
-    assert data2["user"]["tenant_id"] == data["user"]["tenant_id"]
+    assert res.status_code == 410
+    assert "deprecated" in res.json()["detail"].lower()
 
 
 def test_signup_with_valid_invite_code() -> None:
@@ -304,6 +288,34 @@ def test_signup_with_invalid_invite_code() -> None:
     )
     assert res.status_code == 400
     assert res.json() == {"detail": "Invalid or expired invite code."}
+
+
+def test_unauthorized_access() -> None:
+    random_id = uuid4()
+    response = client.post(
+        f"/decisions/{random_id}/approval",
+        json={"status": "APPROVED", "approver_id": "test-approver"},
+    )
+    assert response.status_code == 401
+
+
+def test_forbidden_role_access() -> None:
+    init_db()
+    login_res = client.post(
+        "/auth/login",
+        json={"email": "tech@praxis.local", "password": "Tech@12345!"},
+    )
+    assert login_res.status_code == 200
+    token = login_res.json()["token"]
+
+    random_id = uuid4()
+    response = client.post(
+        f"/complaints/{random_id}/approve",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"comment": "unauthorized approval attempt"},
+    )
+    assert response.status_code == 403
+
 
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
@@ -10,11 +11,12 @@ from uuid import UUID
 import bcrypt
 from clerk_backend_api import Clerk, authenticate_request
 from clerk_backend_api.security.types import AuthenticateRequestOptions
-from fastapi import Header, HTTPException, Request, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from jose import JWTError, jwt
 
 from backend.app.config import (
     CLERK_SECRET_KEY,
+    ENV,
     JWT_ALGORITHM,
     JWT_EXPIRE_HOURS,
     JWT_SECRET,
@@ -102,6 +104,34 @@ def verify_jwt(token: str) -> dict[str, str] | None:
         return None
 
 
+class UserContext(dict):
+    """Dictionary representing authenticated user, supporting attribute access."""
+
+    def __getattr__(self, name: str):
+        try:
+            return self[name]
+        except KeyError:
+            raise AttributeError(f"'UserContext' object has no attribute '{name}'") from None
+
+
+def require_role(allowed_roles: list[str] | set[str]):
+    """FastAPI dependency factory enforcing RBAC based on user role."""
+    allowed = {r.lower() for r in allowed_roles}
+
+    def _role_checker(
+        current_user: dict[str, object] = Depends(get_current_user),
+    ) -> dict[str, object]:
+        role = str(current_user.get("role", "")).lower()
+        if role not in allowed:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Role is not authorised for this action.",
+            )
+        return current_user
+
+    return _role_checker
+
+
 class _HeaderAuthWrapper:
     def __init__(self, headers: Mapping[str, str]) -> None:
         self._headers = headers
@@ -147,6 +177,11 @@ def get_current_user_clerk(
         email_from_token = state.payload.get("email") or state.payload.get("email_address")
     else:
         # Fallback for local development or testing when secret key is unset
+        if os.getenv("ENVIRONMENT") == "production" or ENV == "production":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Clerk authentication failed",
+            )
         try:
             claims = jwt.get_unverified_claims(raw_token)
             clerk_user_id = str(claims.get("sub", "")).strip() or None
@@ -206,15 +241,15 @@ def get_current_user_clerk(
                 session.commit()
                 session.refresh(user)
 
-        return {
-            "id": user.id,
-            "email": user.email,
-            "role": user.role,
-            "tenant_id": str(user.tenant_id),
-            "company_name": user.company_name,
-            "is_admin": bool(user.is_admin),
-            "clerk_user_id": user.clerk_user_id,
-        }
+        return UserContext(
+            id=user.id,
+            email=user.email,
+            role=user.role,
+            tenant_id=str(user.tenant_id),
+            company_name=user.company_name,
+            is_admin=bool(user.is_admin),
+            clerk_user_id=user.clerk_user_id,
+        )
 
 
 def get_current_user(
@@ -250,14 +285,14 @@ def get_current_user(
                 or str(user.tenant_id) != str(UUID(str(payload["tenant_id"])))
             ):
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid user token")
-            return {
-                "id": user.id,
-                "email": user.email,
-                "role": user.role,
-                "tenant_id": str(user.tenant_id),
-                "company_name": user.company_name,
-                "is_admin": bool(user.is_admin),
-            }
+            return UserContext(
+                id=user.id,
+                email=user.email,
+                role=user.role,
+                tenant_id=str(user.tenant_id),
+                company_name=user.company_name,
+                is_admin=bool(user.is_admin),
+            )
 
     # 2. Fall back to Clerk authentication
     return get_current_user_clerk(request=request, authorization=auth_header)

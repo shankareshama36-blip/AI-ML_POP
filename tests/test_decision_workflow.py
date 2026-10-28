@@ -4,6 +4,8 @@ from fastapi.testclient import TestClient
 
 os.environ.setdefault("JWT_SECRET", "test-secret-not-for-production")
 
+from uuid import UUID
+
 from backend.app.auth_real import create_jwt, hash_password
 from backend.app.db import SessionLocal, User, init_db
 from backend.app.decision_engine import (
@@ -17,6 +19,8 @@ from backend.app.formal_engine import MaintenanceRequest
 from backend.app.main import app
 from backend.app.models import MachineState, OperationalConstraints
 
+TEST_TENANT_ID = UUID("00000000-0000-0000-0000-000000000000")
+
 init_db()
 with SessionLocal() as session:
     user = session.query(User).filter_by(email="decision-test@praxis.local").first()
@@ -25,15 +29,34 @@ with SessionLocal() as session:
             email="decision-test@praxis.local",
             password_hash=hash_password("StrongTestPassword1"),
             role="maintenance_supervisor",
-            tenant_id="00000000-0000-0000-0000-000000000000",
+            tenant_id=TEST_TENANT_ID,
             company_name="Test Company",
         )
         session.add(user)
         session.commit()
         session.refresh(user)
-    token = create_jwt(user.id, user.role, user.tenant_id or "00000000-0000-0000-0000-000000000000")
+    token = create_jwt(user.id, user.role, user.tenant_id or TEST_TENANT_ID)
+
+    tech_user = session.query(User).filter_by(email="decision-tech@praxis.local").first()
+    if tech_user is None:
+        tech_user = User(
+            email="decision-tech@praxis.local",
+            password_hash=hash_password("StrongTestPassword1"),
+            role="technician",
+            tenant_id=user.tenant_id,
+            company_name=user.company_name,
+        )
+        session.add(tech_user)
+        session.commit()
+        session.refresh(tech_user)
+    elif tech_user.tenant_id != user.tenant_id:
+        tech_user.tenant_id = user.tenant_id
+        session.commit()
+        session.refresh(tech_user)
+    tech_token = create_jwt(tech_user.id, tech_user.role, tech_user.tenant_id)
 
 client = TestClient(app, headers={"Authorization": f"Bearer {token}"})
+tech_client = TestClient(app, headers={"Authorization": f"Bearer {tech_token}"})
 
 FORMAL_REQUEST = {
     "machine_id": "M-101",
@@ -61,7 +84,7 @@ DECISION_PAYLOAD = {
 
 
 def _create_decision() -> dict[str, object]:
-    response = client.post("/decisions/evaluate", json=DECISION_PAYLOAD)
+    response = tech_client.post("/decisions/evaluate", json=DECISION_PAYLOAD)
 
     assert response.status_code == 201
     return response.json()
