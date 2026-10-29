@@ -163,6 +163,7 @@ def get_current_user_clerk(
     raw_token = auth_header.removeprefix("Bearer ").strip()
     clerk_user_id: str | None = None
     email_from_token: str | None = None
+    role_from_token: str | None = None
 
     if CLERK_SECRET_KEY:
         req_obj = request if request is not None else _HeaderAuthWrapper({"authorization": auth_header})
@@ -175,17 +176,23 @@ def get_current_user_clerk(
             )
         clerk_user_id = str(state.payload.get("sub", "")).strip() or None
         email_from_token = state.payload.get("email") or state.payload.get("email_address")
+        pub_meta = state.payload.get("public_metadata")
+        if isinstance(pub_meta, dict) and isinstance(pub_meta.get("role"), str):
+            role_from_token = pub_meta["role"]
     else:
         # Fallback for local development or testing when secret key is unset
         if os.getenv("ENVIRONMENT") == "production" or ENV == "production":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Clerk authentication failed",
+                detail="Clerk authentication failed: CLERK_SECRET_KEY required in production",
             )
         try:
             claims = jwt.get_unverified_claims(raw_token)
             clerk_user_id = str(claims.get("sub", "")).strip() or None
             email_from_token = claims.get("email") or claims.get("email_address")
+            pub_meta = claims.get("public_metadata")
+            if isinstance(pub_meta, dict) and isinstance(pub_meta.get("role"), str):
+                role_from_token = pub_meta["role"]
         except Exception:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -198,7 +205,8 @@ def get_current_user_clerk(
             detail="Missing user identifier in Clerk token",
         )
 
-    from backend.app.db import SessionLocal, User, create_tenant
+    from backend.app.config import DEFAULT_TENANT_ID, DEFAULT_WORKSPACE_NAME
+    from backend.app.db import ALLOWED_ROLES, SessionLocal, User, _ensure_tenant
 
     with SessionLocal() as session:
         user = session.query(User).filter_by(clerk_user_id=clerk_user_id).first()
@@ -225,28 +233,44 @@ def get_current_user_clerk(
                 session.refresh(existing_user)
                 user = existing_user
             else:
-                prefix = email.split("@")[0].replace(".", " ").capitalize()
-                tenant_name = f"{prefix} Workspace"
-                tenant = create_tenant(session, tenant_name)
+                default_role = "explorer"
+                if role_from_token and role_from_token in ALLOWED_ROLES:
+                    default_role = role_from_token
+
+                target_tenant_id = UUID(DEFAULT_TENANT_ID)
+                tenant = _ensure_tenant(session, target_tenant_id, DEFAULT_WORKSPACE_NAME)
                 user = User(
                     email=email,
                     password_hash="",
                     clerk_user_id=clerk_user_id,
-                    role="explorer",
+                    role=default_role,
                     tenant_id=tenant.id,
                     company_name=tenant.name,
-                    is_admin=True,
+                    is_admin=False,
                 )
                 session.add(user)
                 session.commit()
                 session.refresh(user)
 
+        if user.tenant_id is None:
+            target_tenant_id = UUID(DEFAULT_TENANT_ID)
+            tenant = _ensure_tenant(session, target_tenant_id, DEFAULT_WORKSPACE_NAME)
+            user.tenant_id = tenant.id
+            user.company_name = tenant.name
+            session.commit()
+            session.refresh(user)
+
+        if not user.role:
+            user.role = "explorer"
+            session.commit()
+            session.refresh(user)
+
         return UserContext(
             id=user.id,
             email=user.email,
-            role=user.role,
+            role=user.role or "explorer",
             tenant_id=str(user.tenant_id),
-            company_name=user.company_name,
+            company_name=user.company_name or DEFAULT_WORKSPACE_NAME,
             is_admin=bool(user.is_admin),
             clerk_user_id=user.clerk_user_id,
         )

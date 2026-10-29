@@ -68,7 +68,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               marginBottom: "20px",
             }}
           >
-            {this.state.error?.message || "An unexpected error occurred."}
+            {this.state.error?.message ? `Error: ${this.state.error.message}` : "Error: An unknown rendering error occurred."}
           </p>
           <button
             type="button"

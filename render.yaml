@@ -16,6 +16,10 @@ services:
         value: production
       - key: ENABLE_DEMO_ACCOUNTS
         value: "true"
+      - key: DEFAULT_TENANT_ID
+        value: "00000000-0000-0000-0000-000000000001"
+      - key: DEFAULT_WORKSPACE_NAME
+        value: "Praxis Main Plant"
       - key: CLERK_PUBLISHABLE_KEY
         value: "pk_test_Y3Jpc3AtdHJvbGwtNDc5Ni5jbGVyay5hY2NvdW50cy5kZXYk"
       - key: CLERK_SECRET_KEY
@@ -26,11 +30,16 @@ services:
   - type: web
     name: praxis-frontend
     runtime: static
+    # NOTE: VITE_* environment variables are baked into JavaScript bundles at build time.
+    # If you change VITE_API_BASE_URL or VITE_CLERK_PUBLISHABLE_KEY in Render, you must
+    # trigger "Manual Deploy > Clear build cache & deploy" to rebuild the frontend assets.
     buildCommand: "cd frontend && npm ci && npm run build"
     staticPublishPath: "frontend/dist"
     envVars:
       - key: VITE_CLERK_PUBLISHABLE_KEY
         value: "pk_test_Y3Jpc3AtdHJvbGwtNDc5Ni5jbGVyay5hY2NvdW50cy5kZXYk"
+      - key: VITE_API_BASE_URL
+        value: "https://praxis-backend.onrender.com"
     routes:
       - type: rewrite
         source: /*

@@ -30,15 +30,14 @@ export function triggerToast(message: string, type: ToastType = "error") {
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function formatUserFriendlyError(err: unknown): string {
-  if (!err) return "An unexpected error occurred.";
+  if (!err) return "Error: Unknown failure occurred.";
+
+  let actualReason = "";
 
   // Check if it's already a clean string
   if (typeof err === "string") {
-    return cleanErrorString(err);
-  }
-
-  // Handle ApiError or standard Error
-  if (typeof err === "object" && err !== null) {
+    actualReason = cleanErrorString(err);
+  } else if (err instanceof Error) {
     const errorObj = err as { status?: number; message?: string; detail?: unknown };
     if (errorObj.status === 401) {
       return "Session expired. Please log in again.";
@@ -52,15 +51,55 @@ export function formatUserFriendlyError(err: unknown): string {
         return "Action not allowed: You must run AI evaluation first.";
       }
     }
-    if (errorObj.message) {
-      return cleanErrorString(errorObj.message);
+    if (typeof errorObj.detail === "string" && errorObj.detail.trim()) {
+      actualReason = cleanErrorString(errorObj.detail);
+    } else if (err.message && err.message.trim()) {
+      actualReason = cleanErrorString(err.message);
+    } else {
+      actualReason = err.name || "Request failed";
     }
-    if (typeof errorObj.detail === "string") {
-      return cleanErrorString(errorObj.detail);
+  } else if (typeof err === "object" && err !== null) {
+    const errorObj = err as { status?: number; message?: string; detail?: unknown; error?: string };
+    if (errorObj.status === 401) {
+      return "Session expired. Please log in again.";
     }
+    if (errorObj.status === 429) {
+      return "Too many sign-in attempts. Please wait a moment before trying again.";
+    }
+    if (typeof errorObj.detail === "string" && errorObj.detail.trim()) {
+      actualReason = cleanErrorString(errorObj.detail);
+    } else if (typeof errorObj.message === "string" && errorObj.message.trim()) {
+      actualReason = cleanErrorString(errorObj.message);
+    } else if (typeof errorObj.error === "string" && errorObj.error.trim()) {
+      actualReason = cleanErrorString(errorObj.error);
+    } else {
+      try {
+        actualReason = JSON.stringify(err);
+      } catch {
+        actualReason = String(err);
+      }
+    }
+  } else {
+    actualReason = String(err);
   }
 
-  return "An unexpected error occurred. Please try again.";
+  if (!actualReason || actualReason === "An unexpected error occurred.") {
+    actualReason = "Request failed. Please check network connection or server status.";
+  }
+
+  // If already prefixed with "Error:" or a specific alert category, return as is
+  if (
+    actualReason.startsWith("Error:") ||
+    actualReason.startsWith("Action not allowed:") ||
+    actualReason.startsWith("Session expired") ||
+    actualReason.startsWith("Too many") ||
+    actualReason.startsWith("Invalid") ||
+    actualReason.startsWith("Unable to")
+  ) {
+    return actualReason;
+  }
+
+  return `Error: ${actualReason}`;
 }
 
 function cleanErrorString(raw: string): string {

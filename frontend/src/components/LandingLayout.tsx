@@ -2,7 +2,19 @@ import { useState, type ReactNode } from "react";
 import { Logo } from "./Logo";
 import { IconArrowRight } from "./Icons";
 
-export type PublicView = "landing" | "about" | "contact" | "legal" | "pricing" | "customize" | "login" | "signup";
+export type PublicView =
+  | "landing"
+  | "about"
+  | "contact"
+  | "legal"
+  | "pricing"
+  | "customize"
+  | "login"
+  | "signup"
+  | "business"
+  | "individual"
+  | "demo"
+  | "now";
 
 /** localStorage key + window event used to deep-link into a LegalPage tab. */
 export const LEGAL_TAB_KEY = "praxis-legal-tab";
@@ -60,7 +72,7 @@ export function LandingLayout({
 
   return (
     <div className="landing-layout-wrapper animate-fade">
-      {/* Top Navbar: Logo left, Nav links center, Sign In + Get Started right */}
+      {/* Top Navbar: Logo left, Nav links center (NO Pricing), "For Business" next to "Log In" */}
       <nav className="landing-nav" aria-label="Primary navigation">
         <button
           type="button"
@@ -81,17 +93,24 @@ export function LandingLayout({
           </button>
           <button
             type="button"
-            className={`nav-link-btn ${currentView === "pricing" ? "active" : ""}`}
-            onClick={() => handleNavLink("pricing")}
+            className={`nav-link-btn ${currentView === "demo" ? "active" : ""}`}
+            onClick={() => handleNavLink("demo")}
           >
-            Pricing
+            Live Demo
           </button>
           <button
             type="button"
-            className={`nav-link-btn ${currentView === "customize" ? "active" : ""}`}
-            onClick={() => handleNavLink("customize")}
+            className={`nav-link-btn ${currentView === "individual" ? "active" : ""}`}
+            onClick={() => handleNavLink("individual")}
           >
-            Customize
+            Individual
+          </button>
+          <button
+            type="button"
+            className={`nav-link-btn ${currentView === "now" ? "active" : ""}`}
+            onClick={() => handleNavLink("now")}
+          >
+            Manifesto
           </button>
           <button
             type="button"
@@ -109,10 +128,24 @@ export function LandingLayout({
           </button>
         </div>
 
-        {/* Actions: Sign In (ghost) & Get Started (primary) */}
+        {/* Actions: "For Business" link placed right next to "Log In" button */}
         <div className="landing-nav-actions">
+          <button
+            type="button"
+            className={`btn-ghost nav-business-btn ${currentView === "business" ? "active" : ""}`}
+            onClick={() => handleNavLink("business")}
+            style={{
+              fontWeight: 600,
+              color: "var(--brand, #3b82f6)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+            }}
+          >
+            For Business
+          </button>
           <button type="button" className="btn-ghost nav-signin" onClick={onSignIn}>
-            Sign In
+            Log In
           </button>
           <button type="button" className="btn-primary landing-nav-btn" onClick={onGetStarted}>
             Get Started Free <IconArrowRight size={14} />
@@ -150,7 +183,39 @@ export function LandingLayout({
           </div>
 
           <div>
-            <h3>Product</h3>
+            <h3>Solutions</h3>
+            <button
+              type="button"
+              className="footer-link-btn"
+              onClick={() => handleNavLink("business")}
+            >
+              Praxis for Business
+            </button>
+            <button
+              type="button"
+              className="footer-link-btn"
+              onClick={() => handleNavLink("individual")}
+            >
+              Praxis for Individuals
+            </button>
+            <button
+              type="button"
+              className="footer-link-btn"
+              onClick={() => handleNavLink("demo")}
+            >
+              Interactive Sandbox Demo
+            </button>
+            <button
+              type="button"
+              className="footer-link-btn"
+              onClick={() => handleNavLink("now")}
+            >
+              Now — Manifesto
+            </button>
+          </div>
+
+          <div>
+            <h3>Platform</h3>
             <button
               type="button"
               className="footer-link-btn"
@@ -158,24 +223,6 @@ export function LandingLayout({
             >
               Features
             </button>
-            <button
-              type="button"
-              className="footer-link-btn"
-              onClick={() => handleNavLink("pricing")}
-            >
-              Pricing
-            </button>
-            <button
-              type="button"
-              className="footer-link-btn"
-              onClick={() => handleNavLink("customize")}
-            >
-              Customize Plan
-            </button>
-          </div>
-
-          <div>
-            <h3>Company</h3>
             <button
               type="button"
               className="footer-link-btn"
@@ -213,7 +260,7 @@ export function LandingLayout({
 
         <div className="footer-bottom">
           <span>© 2026 Praxis Platform. All rights reserved.</span>
-          <span>Built for accountable operations.</span>
+          <span>Built for accountable operations with formal verification.</span>
         </div>
       </footer>
     </div>

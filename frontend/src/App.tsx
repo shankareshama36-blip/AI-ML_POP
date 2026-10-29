@@ -1,16 +1,13 @@
-import { useState, useEffect } from "react";
-import { useAuth } from "@clerk/clerk-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useAuth, useClerk, useUser } from "@clerk/clerk-react";
 import {
-  ApiError,
   login,
   logout,
   pingHealth,
   setClerkTokenGetter,
-  updateProfile,
-  verifyToken,
   type User,
-  type UserRole,
 } from "./api";
+
 import { LandingPage } from "./pages/LandingPage";
 import { AboutPage } from "./pages/AboutPage";
 import { ContactPage } from "./pages/ContactPage";
@@ -25,16 +22,54 @@ import { CustomizePage } from "./pages/CustomizePage";
 import { ExplorerPage } from "./pages/ExplorerPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ChatPage } from "./pages/ChatPage";
+import { DemoPage } from "./pages/DemoPage";
+import { IndividualPage } from "./pages/IndividualPage";
+import { BusinessPage } from "./pages/BusinessPage";
+import { NowPage } from "./pages/NowPage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ToastProvider } from "./components/Toast";
 import { GlobalColdStartOverlay } from "./components/GlobalColdStartOverlay";
 import { LandingLayout, type PublicView } from "./components/LandingLayout";
 import "./App.css";
 
-type View = "landing" | "pricing" | "customize" | "about" | "contact" | "legal" | "login" | "signup" | "forgot" | "app" | "explorer" | "settings" | "chat";
+type View =
+  | "landing"
+  | "pricing"
+  | "customize"
+  | "about"
+  | "contact"
+  | "legal"
+  | "business"
+  | "individual"
+  | "demo"
+  | "now"
+  | "login"
+  | "signup"
+  | "forgot"
+  | "app"
+  | "explorer"
+  | "settings"
+  | "chat";
 
-const PUBLIC_VIEWS: Set<string> = new Set(["landing", "pricing", "customize", "about", "contact", "legal"]);
-const PROTECTED_VIEWS: Set<string> = new Set(["app", "explorer", "settings", "chat"]);
+const PUBLIC_VIEWS: Set<string> = new Set([
+  "landing",
+  "pricing",
+  "customize",
+  "about",
+  "contact",
+  "legal",
+  "business",
+  "individual",
+  "demo",
+  "now",
+]);
+
+const PROTECTED_VIEWS: Set<string> = new Set([
+  "app",
+  "explorer",
+  "settings",
+  "chat",
+]);
 
 const DEMO_SWITCH_ACCOUNTS = [
   { label: "Tech", email: "tech@praxis.local", pass: "Tech@12345!" },
@@ -43,106 +78,186 @@ const DEMO_SWITCH_ACCOUNTS = [
   { label: "Plant Mgr", email: "plant@praxis.local", pass: "Plant@12345!" },
 ];
 
-const PUBLISHABLE_KEY =
-  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ||
-  import.meta.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ||
-  "pk_test_Y3Jpc3AtdHJvbGwtNDc5Ni5jbGVyay5hY2NvdW50cy5kZXYk";
-
-function ClerkSessionListener({ onSync }: { onSync: (user: User) => void }) {
-  const { getToken, userId, isSignedIn } = useAuth();
-
-  useEffect(() => {
-    if (isSignedIn && userId) {
-      setClerkTokenGetter(() => getToken());
-      void (async () => {
-        try {
-          let verified = await verifyToken();
-          const pendingRole = localStorage.getItem("praxis-signup-role") as UserRole | null;
-          const pendingInvite = localStorage.getItem("praxis-signup-invite");
-          if (pendingRole || pendingInvite) {
-            try {
-              const updated = await updateProfile(pendingRole || undefined, pendingInvite || undefined);
-              verified = updated.user;
-            } catch {
-              // ignore profile update error if invite code was empty/invalid
-            } finally {
-              localStorage.removeItem("praxis-signup-role");
-              localStorage.removeItem("praxis-signup-invite");
-            }
-          }
-          onSync(verified);
-        } catch (err) {
-          console.warn("Clerk session synchronization pending:", err);
-        }
-      })();
-    } else {
-      setClerkTokenGetter(null);
-    }
-  }, [isSignedIn, userId, getToken, onSync]);
-
-  return null;
-}
-
 const VALID_VIEWS: Set<string> = new Set([
-  "landing", "pricing", "customize", "about", "contact", "legal",
-  "login", "signup", "forgot", "app", "explorer", "settings", "chat",
+  "landing",
+  "pricing",
+  "customize",
+  "about",
+  "contact",
+  "legal",
+  "business",
+  "individual",
+  "demo",
+  "now",
+  "login",
+  "signup",
+  "forgot",
+  "app",
+  "explorer",
+  "settings",
+  "chat",
 ]);
 
-function getInitialUser(): User | null {
+function getInitialView(isSignedIn?: boolean): View {
   try {
-    const hasToken = localStorage.getItem("praxis-token") || sessionStorage.getItem("praxis-token");
-    if (!hasToken) return null;
-    const rawUser = localStorage.getItem("praxis-user") ?? sessionStorage.getItem("praxis-user");
-    if (!rawUser) return null;
-    return JSON.parse(rawUser) as User;
-  } catch {
-    return null;
-  }
-}
-
-function getInitialView(initialUser: User | null): View {
-  try {
-    const saved = localStorage.getItem("praxis-current-view") ?? sessionStorage.getItem("praxis-current-view");
-    if (saved && VALID_VIEWS.has(saved)) {
-      if (initialUser) {
-        if (saved === "login" || saved === "signup" || saved === "forgot") {
-          return initialUser.role === "explorer" || initialUser.role === "creator" ? "explorer" : "app";
+    if (typeof window !== "undefined") {
+      // 1. If isSignedIn (from Clerk) is true: Check localStorage for protected view
+      if (isSignedIn) {
+        const saved = localStorage.getItem("praxis-current-view");
+        if (saved && PROTECTED_VIEWS.has(saved)) {
+          return saved as View;
         }
-        return saved as View;
+        const path = window.location.pathname.replace(/^\//, "").trim();
+        if (path && PROTECTED_VIEWS.has(path)) {
+          return path as View;
+        }
+        return "app";
       }
-      if (PUBLIC_VIEWS.has(saved) || saved === "login" || saved === "signup" || saved === "forgot") {
-        return saved as View;
-      }
-    }
-    if (initialUser) {
-      return initialUser.role === "explorer" || initialUser.role === "creator" ? "explorer" : "app";
+
+      // 2. If isSignedIn is false: ALWAYS return "landing"
+      return "landing";
     }
   } catch {
-    // ignore storage errors
+    // ignore storage or window errors
   }
   return "landing";
 }
 
 function App() {
-  const [user, setUser] = useState<User | null>(() => getInitialUser());
-  const [view, setView] = useState<View>(() => getInitialView(user));
+  const { getToken, userId, isSignedIn, isLoaded } = useAuth();
+  const { user: clerkUser } = useUser();
+  const { signOut } = useClerk();
+
+  const [demoUser, setDemoUser] = useState<User | null>(null);
+  const [view, setView] = useState<View>(() => getInitialView(isSignedIn));
   const [switchingDemo, setSwitchingDemo] = useState<string | null>(null);
 
-  // Listen to hash changes from Clerk's internal Sign In / Sign Up footer links (#/login, #/signup)
-  useEffect(() => {
-    function handleHashChange() {
-      const hash = window.location.hash;
-      if (hash.startsWith("#/login")) {
-        setView("login");
-      } else if (hash.startsWith("#/signup")) {
-        setView("signup");
+  // Synchronize view state with browser URL, history, and localStorage
+  const changeView = useCallback((newView: View, replace = false) => {
+    setView(newView);
+    try {
+      localStorage.setItem("praxis-current-view", newView);
+      sessionStorage.setItem("praxis-current-view", newView);
+    } catch {
+      // ignore
+    }
+    if (typeof window !== "undefined") {
+      const path = newView === "landing" ? "/" : `/${newView}`;
+      if (window.location.pathname !== path) {
+        if (replace) {
+          window.history.replaceState({ view: newView }, "", path);
+        } else {
+          window.history.pushState({ view: newView }, "", path);
+        }
       }
     }
-    window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
 
-  // Scroll to top when view changes and persist current view in localStorage
+  // Listen to browser Back and Forward navigation (popstate)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const currentPath = view === "landing" ? "/" : `/${view}`;
+      if (!window.history.state || window.history.state.view !== view) {
+        window.history.replaceState({ view }, "", currentPath);
+      }
+    }
+
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state && typeof event.state === "object" && "view" in event.state) {
+        const targetView = event.state.view;
+        if (typeof targetView === "string" && VALID_VIEWS.has(targetView)) {
+          setView(targetView as View);
+          return;
+        }
+      }
+      const path = window.location.pathname.replace(/^\//, "").trim();
+      if (path && VALID_VIEWS.has(path)) {
+        setView(path as View);
+      } else {
+        setView("landing");
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [view]);
+
+  // Derive active user strictly from Clerk authentication state
+  const clerkAppUser: User = {
+    id: 1,
+    email: clerkUser?.primaryEmailAddress?.emailAddress || `${userId || "user"}@clerk.user`,
+    role: (clerkUser?.publicMetadata?.role as string) || "explorer",
+    tenant_id: "00000000-0000-0000-0000-000000000001",
+    company_name: "Praxis Main Plant",
+    is_admin: Boolean(
+      clerkUser?.publicMetadata?.role === "plant_manager" ||
+      clerkUser?.publicMetadata?.role === "business_owner"
+    ),
+    clerk_user_id: userId || undefined,
+  };
+
+  const user: User | null = isSignedIn ? clerkAppUser : demoUser;
+
+  // Single authority for auth routing: strictly dependent on [isLoaded, isSignedIn]
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    if (isSignedIn) {
+      setClerkTokenGetter(() => getToken());
+      setView((prev) => {
+        // If localStorage has a saved protected view, restore it
+        const saved = typeof window !== "undefined" ? localStorage.getItem("praxis-current-view") : null;
+        if (saved && PROTECTED_VIEWS.has(saved)) {
+          if (typeof window !== "undefined") {
+            const path = `/${saved}`;
+            if (window.location.pathname !== path) {
+              window.history.replaceState({ view: saved }, "", path);
+            }
+          }
+          return saved as View;
+        }
+
+        // Check if current URL pathname is a protected view
+        const path = typeof window !== "undefined" ? window.location.pathname.replace(/^\//, "").trim() : "";
+        if (path && PROTECTED_VIEWS.has(path)) {
+          return path as View;
+        }
+
+        // If user is on an auth or landing page upon login, route to dashboard
+        if (
+          prev === "landing" ||
+          prev === "login" ||
+          prev === "signup" ||
+          prev === "forgot"
+        ) {
+          const defaultDash: View = "app";
+          if (typeof window !== "undefined") {
+            window.history.replaceState({ view: defaultDash }, "", `/${defaultDash}`);
+          }
+          return defaultDash;
+        }
+        return prev;
+      });
+    } else {
+      setClerkTokenGetter(null);
+      setView((prev) => {
+        if (PROTECTED_VIEWS.has(prev)) {
+          if (typeof window !== "undefined") {
+            window.history.replaceState({ view: "landing" }, "", "/");
+          }
+          return "landing";
+        }
+        return prev;
+      });
+    }
+  }, [isLoaded, isSignedIn]);
+
+  // Proactively ping health endpoint to wake up Render container
+  useEffect(() => {
+    void pingHealth();
+  }, []);
+
+  // Sync view to localStorage on every change
   useEffect(() => {
     try {
       localStorage.setItem("praxis-current-view", view);
@@ -150,61 +265,72 @@ function App() {
     } catch {
       // Storage blocked or quota exceeded
     }
-    if (typeof window !== "undefined") {
-      window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
-    }
   }, [view]);
 
+  // Listen to hash changes from Clerk's internal footer links (#/login, #/signup)
   useEffect(() => {
-    // Proactively ping health endpoint to wake up Render container
-    void pingHealth();
+    function handleHashChange() {
+      const hash = window.location.hash;
+      if (hash.startsWith("#/login") && !isSignedIn) {
+        changeView("login");
+      } else if (hash.startsWith("#/signup") && !isSignedIn) {
+        changeView("signup");
+      }
+    }
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, [isSignedIn, changeView]);
 
-    async function verifyBackgroundSession() {
-      const hasToken = localStorage.getItem("praxis-token") || sessionStorage.getItem("praxis-token");
-      if (!hasToken) return;
+  // Exact scroll restoration across page reloads using sessionStorage
+  useEffect(() => {
+    const savedPos = sessionStorage.getItem("praxis-scroll-pos");
+    if (savedPos) {
+      const targetY = parseInt(savedPos, 10);
+      if (!Number.isNaN(targetY) && targetY > 0) {
+        requestAnimationFrame(() => {
+          window.scrollTo(0, targetY);
+        });
+      }
+    }
 
-      try {
-        const verified = await verifyToken();
-        setUser(verified);
-        localStorage.setItem("praxis-user", JSON.stringify(verified));
-        const savedView = localStorage.getItem("praxis-current-view");
-        if (savedView && VALID_VIEWS.has(savedView)) {
-          setView(savedView as View);
-        }
-      } catch (err) {
-        // Only invalidate session on explicit 401 Unauthorized (token expired or revoked)
-        if (err instanceof ApiError && err.status === 401) {
-          logout();
-          setUser(null);
+    let ticking = false;
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
           try {
-            localStorage.removeItem("praxis-current-view");
-            sessionStorage.removeItem("praxis-current-view");
+            sessionStorage.setItem("praxis-scroll-pos", window.scrollY.toString());
           } catch {
             // ignore
           }
-          setView((prev) => (PROTECTED_VIEWS.has(prev) ? "login" : prev));
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // When view changes to a different page, reset scroll to top
+  const prevViewRef = useRef(view);
+  useEffect(() => {
+    if (prevViewRef.current !== view) {
+      prevViewRef.current = view;
+      if (typeof window !== "undefined") {
+        window.scrollTo(0, 0);
+        try {
+          sessionStorage.setItem("praxis-scroll-pos", "0");
+        } catch {
+          // ignore
         }
       }
     }
-    void verifyBackgroundSession();
-  }, []);
+  }, [view]);
 
-  function handleLoginSuccess(authenticatedUser: User, token: string, persist = true) {
-    setUser(authenticatedUser);
-    const storage = persist ? localStorage : sessionStorage;
-    storage.setItem("praxis-token", token);
-    storage.setItem("praxis-user", JSON.stringify(authenticatedUser));
-    localStorage.setItem("praxis-welcome", "true");
-    const targetView: View =
-      authenticatedUser.role === "explorer" || authenticatedUser.role === "creator"
-        ? "explorer"
-        : "app";
-    try {
-      localStorage.setItem("praxis-current-view", targetView);
-    } catch {
-      // ignore
-    }
-    setView(targetView);
+  function handleLoginSuccess(authenticatedUser: User) {
+    setDemoUser(authenticatedUser);
+    changeView("app");
   }
 
   async function handleDemoRoleSwitch(email: string, pass: string) {
@@ -212,13 +338,11 @@ function App() {
     setSwitchingDemo(email);
     try {
       const res = await login(email, pass, true);
-      setUser(res.user);
-      localStorage.setItem("praxis-token", res.token);
-      localStorage.setItem("praxis-user", JSON.stringify(res.user));
+      setDemoUser(res.user);
       if (view === "settings" && res.user.role !== "plant_manager") {
-        setView("app");
+        changeView("app");
       } else if (!PROTECTED_VIEWS.has(view)) {
-        setView("app");
+        changeView("app");
       }
     } catch (err) {
       console.error("Failed to switch demo account:", err);
@@ -227,21 +351,44 @@ function App() {
     }
   }
 
-  function handleLogout() {
-    setUser(null);
+  async function handleLogout() {
+    setDemoUser(null);
     logout();
     setClerkTokenGetter(null);
     try {
       localStorage.removeItem("praxis-current-view");
       sessionStorage.removeItem("praxis-current-view");
+      sessionStorage.removeItem("praxis-scroll-pos");
+      await signOut();
     } catch {
       // ignore
     }
-    setView("login");
+    changeView("landing", true);
   }
 
   function handleNavigate(target: PublicView) {
-    setView(target as View);
+    changeView(target as View);
+  }
+
+  // 1. If Clerk is not loaded yet, return a clean loading spinner without redirecting
+  if (!isLoaded) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#0a0f1d",
+          color: "#94a3b8",
+        }}
+      >
+        <div style={{ textAlign: "center" }}>
+          <div className="coldstart-spinner" style={{ margin: "0 auto 16px" }} />
+          <p style={{ fontSize: "14px", fontWeight: 500 }}>Connecting to secure session…</p>
+        </div>
+      </div>
+    );
   }
 
   const isPublicView = PUBLIC_VIEWS.has(view);
@@ -254,21 +401,6 @@ function App() {
     <ErrorBoundary fallbackTitle="Application Error">
       <ToastProvider>
         <GlobalColdStartOverlay />
-        {PUBLISHABLE_KEY && (
-          <ClerkSessionListener
-            onSync={(syncedUser) => {
-              setUser(syncedUser);
-              localStorage.setItem("praxis-user", JSON.stringify(syncedUser));
-              setView((prev) =>
-                prev === "login" || prev === "signup"
-                  ? syncedUser.role === "explorer" || syncedUser.role === "creator"
-                    ? "explorer"
-                    : "app"
-                  : prev
-              );
-            }}
-          />
-        )}
 
         {/* ── Workspace Navigation Bar for Logged-In Users ── */}
         {user && (
@@ -277,21 +409,21 @@ function App() {
               <button
                 type="button"
                 className={`ws-nav-pill ${view === "explorer" ? "active" : ""}`}
-                onClick={() => setView("explorer")}
+                onClick={() => changeView("explorer")}
               >
                 🧭 Customizable AI Playground
               </button>
               <button
                 type="button"
                 className={`ws-nav-pill ${view === "app" ? "active" : ""}`}
-                onClick={() => setView("app")}
+                onClick={() => changeView("app")}
               >
                 🏭 Factory Operations
               </button>
               <button
                 type="button"
                 className={`ws-nav-pill ${view === "chat" ? "active" : ""}`}
-                onClick={() => setView("chat")}
+                onClick={() => changeView("chat")}
               >
                 💬 AI Assistant
               </button>
@@ -299,7 +431,7 @@ function App() {
                 <button
                   type="button"
                   className={`ws-nav-pill ${view === "settings" ? "active" : ""}`}
-                  onClick={() => setView("settings")}
+                  onClick={() => changeView("settings")}
                 >
                   ⚙️ Settings
                 </button>
@@ -327,7 +459,7 @@ function App() {
               <button
                 type="button"
                 className={`ws-nav-pill subtle ${view === "landing" ? "active" : ""}`}
-                onClick={() => setView("landing")}
+                onClick={() => changeView("landing")}
               >
                 🌐 Home
               </button>
@@ -336,20 +468,52 @@ function App() {
         )}
 
         <div key={view} className="view-transition">
-
           {/* ── Public views wrapped in shared LandingLayout nav + footer ── */}
           {isPublicView && (
             <LandingLayout
               onNavigate={handleNavigate}
-              onSignIn={() => setView("login")}
-              onGetStarted={() => setView("signup")}
+              onSignIn={() => changeView("login")}
+              onGetStarted={() => changeView("signup")}
               currentView={view as PublicView}
             >
               {view === "landing" && (
                 <ErrorBoundary fallbackTitle="Landing Page Error">
                   <LandingPage
-                    onSignIn={() => setView("login")}
-                    onGetStarted={() => setView("signup")}
+                    onSignIn={() => changeView("login")}
+                    onGetStarted={() => changeView("signup")}
+                    onNavigate={handleNavigate}
+                  />
+                </ErrorBoundary>
+              )}
+              {view === "demo" && (
+                <ErrorBoundary fallbackTitle="Demo Sandbox Error">
+                  <DemoPage
+                    onDemoLogin={handleLoginSuccess}
+                    onNavigate={handleNavigate}
+                  />
+                </ErrorBoundary>
+              )}
+              {view === "individual" && (
+                <ErrorBoundary fallbackTitle="Individual Page Error">
+                  <IndividualPage
+                    onNavigate={handleNavigate}
+                    onGetStarted={() => changeView("signup")}
+                  />
+                </ErrorBoundary>
+              )}
+              {view === "business" && (
+                <ErrorBoundary fallbackTitle="Business Page Error">
+                  <BusinessPage
+                    onNavigate={handleNavigate}
+                    onGetStarted={() => changeView("signup")}
+                  />
+                </ErrorBoundary>
+              )}
+              {view === "now" && (
+                <ErrorBoundary fallbackTitle="Manifesto Error">
+                  <NowPage
+                    onNavigate={handleNavigate}
+                    onGetStarted={() => changeView("signup")}
                   />
                 </ErrorBoundary>
               )}
@@ -357,21 +521,23 @@ function App() {
                 <ErrorBoundary fallbackTitle="Pricing Page Error">
                   <PricingPage
                     onNavigate={handleNavigate}
-                    onGetStarted={() => setView("signup")}
+                    onGetStarted={() => changeView("signup")}
                   />
                 </ErrorBoundary>
               )}
               {view === "customize" && (
                 <ErrorBoundary fallbackTitle="Customizer Error">
                   <CustomizePage
+                    user={user}
                     onNavigate={handleNavigate}
-                    onGetStarted={() => setView("signup")}
+                    onGetStarted={() => changeView("signup")}
+                    onUpgradeSuccess={() => changeView("app")}
                   />
                 </ErrorBoundary>
               )}
               {view === "about" && (
                 <ErrorBoundary fallbackTitle="About Page Error">
-                  <AboutPage onNavigate={handleNavigate} onGetStarted={() => setView("signup")} />
+                  <AboutPage onNavigate={handleNavigate} onGetStarted={() => changeView("signup")} />
                 </ErrorBoundary>
               )}
               {view === "contact" && (
@@ -387,31 +553,31 @@ function App() {
             </LandingLayout>
           )}
 
-          {/* ── Auth views (also fallback if protected view is reached while unauthenticated) ── */}
-          {(view === "login" || (PROTECTED_VIEWS.has(view) && !user)) && (
+          {/* ── Auth views (only rendered when user is NOT signed in) ── */}
+          {!isSignedIn && (view === "login" || (PROTECTED_VIEWS.has(view) && !user)) && (
             <ErrorBoundary fallbackTitle="Login Error">
               <LoginPage
                 onLogin={handleLoginSuccess}
-                onBack={() => setView("landing")}
-                onSignup={() => setView("signup")}
-                onForgotPassword={() => setView("forgot")}
+                onBack={() => changeView("landing")}
+                onSignup={() => changeView("signup")}
+                onForgotPassword={() => changeView("forgot")}
               />
             </ErrorBoundary>
           )}
 
-          {view === "signup" && (
+          {!isSignedIn && view === "signup" && (
             <ErrorBoundary fallbackTitle="Sign Up Error">
               <SignupPage
                 onSignup={handleLoginSuccess}
-                onSignIn={() => setView("login")}
-                onBack={() => setView("landing")}
+                onSignIn={() => changeView("login")}
+                onBack={() => changeView("landing")}
               />
             </ErrorBoundary>
           )}
 
-          {view === "forgot" && (
+          {!isSignedIn && view === "forgot" && (
             <ErrorBoundary fallbackTitle="Password Reset Error">
-              <ForgotPasswordPage onSignIn={() => setView("login")} />
+              <ForgotPasswordPage onSignIn={() => changeView("login")} />
             </ErrorBoundary>
           )}
 
@@ -421,8 +587,8 @@ function App() {
               <ExplorerPage
                 user={user}
                 onLogout={handleLogout}
-                onOpenSettings={canAccessSettings ? () => setView("settings") : undefined}
-                onOpenChat={() => setView("chat")}
+                onOpenSettings={canAccessSettings ? () => changeView("settings") : undefined}
+                onOpenChat={() => changeView("chat")}
               />
             </ErrorBoundary>
           )}
@@ -432,7 +598,7 @@ function App() {
             <ErrorBoundary fallbackTitle="Voice Chat Error">
               <ChatPage
                 user={user}
-                onBack={() => setView(["explorer", "creator"].includes(user.role) ? "explorer" : "app")}
+                onBack={() => changeView(["explorer", "creator"].includes(user.role) ? "explorer" : "app")}
                 onLogout={handleLogout}
               />
             </ErrorBoundary>
@@ -445,13 +611,13 @@ function App() {
                 <TechnicianPage
                   user={user}
                   onLogout={handleLogout}
-                  onOpenSettings={canAccessSettings ? () => setView("settings") : undefined}
+                  onOpenSettings={canAccessSettings ? () => changeView("settings") : undefined}
                 />
               ) : (
                 <ApproverPage
                   user={user}
                   onLogout={handleLogout}
-                  onOpenSettings={canAccessSettings ? () => setView("settings") : undefined}
+                  onOpenSettings={canAccessSettings ? () => changeView("settings") : undefined}
                 />
               )}
             </ErrorBoundary>
@@ -462,7 +628,7 @@ function App() {
             <ErrorBoundary fallbackTitle="Settings Error">
               <SettingsPage
                 user={user}
-                onBack={() => setView(["explorer", "creator"].includes(user.role) ? "explorer" : "app")}
+                onBack={() => changeView(["explorer", "creator"].includes(user.role) ? "explorer" : "app")}
                 onLogout={handleLogout}
               />
             </ErrorBoundary>

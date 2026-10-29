@@ -1,23 +1,14 @@
-import { useState, useEffect } from "react";
-import { SignIn } from "@clerk/clerk-react";
-import { login, pingHealth, type User } from "../api";
-import { IconSpinner } from "../components/Icons";
+import { useEffect } from "react";
+import { SignIn, useAuth } from "@clerk/clerk-react";
+import { pingHealth, type User } from "../api";
 import { Logo } from "../components/Logo";
-import { useToast, formatUserFriendlyError } from "../components/Toast";
 
 interface LoginPageProps {
-  onLogin: (user: User, token: string, persist?: boolean) => void;
+  onLogin?: (user: User, token?: string, persist?: boolean) => void;
   onBack?: () => void;
-  onSignup: () => void;
+  onSignup?: () => void;
   onForgotPassword?: () => void;
 }
-
-const DEMO_ACCOUNTS = [
-  { role: "Technician", email: "tech@praxis.local", password: "Tech@12345!" },
-  { role: "Maintenance Supervisor", email: "maint@praxis.local", password: "Maint@12345!" },
-  { role: "Production Supervisor", email: "prod@praxis.local", password: "Prod@12345!" },
-  { role: "Plant Manager", email: "plant@praxis.local", password: "Plant@12345!" },
-];
 
 const PUBLISHABLE_KEY =
   import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ||
@@ -25,6 +16,10 @@ const PUBLISHABLE_KEY =
   "pk_test_Y3Jpc3AtdHJvbGwtNDc5Ni5jbGVyay5hY2NvdW50cy5kZXYk";
 
 const clerkAppearance = {
+  layout: {
+    socialButtonsPlacement: "top" as const,
+    socialButtonsVariant: "blockButton" as const,
+  },
   variables: {
     colorPrimary: "#2563eb",
     colorBackground: "#0f172a",
@@ -66,32 +61,22 @@ const clerkAppearance = {
   },
 };
 
-export function LoginPage({ onLogin, onBack }: LoginPageProps) {
-  const { showToast } = useToast();
-  const [loading, setLoading] = useState(false);
-  const [showDemoRoles, setShowDemoRoles] = useState(false);
-  const [demoLoggingIn, setDemoLoggingIn] = useState<string | null>(null);
+export function LoginPage({ onBack, onLogin }: LoginPageProps) {
+  const { isSignedIn } = useAuth();
 
   useEffect(() => {
     void pingHealth();
-  }, []);
-
-  async function handleDemoLogin(demoEmail: string, demoPass: string, roleLabel: string) {
-    setLoading(true);
-    setDemoLoggingIn(demoEmail);
-
-    try {
-      const result = await login(demoEmail, demoPass, true);
-      showToast(`Signed in as ${roleLabel}`, "success");
-      onLogin(result.user, result.token, true);
-    } catch (err) {
-      console.error("Demo login failed:", err);
-      const friendlyMsg = formatUserFriendlyError(err);
-      showToast(friendlyMsg, "error");
-    } finally {
-      setLoading(false);
-      setDemoLoggingIn(null);
+    if (isSignedIn && onLogin) {
+      onLogin({} as User, "");
     }
+  }, [isSignedIn, onLogin]);
+
+  if (isSignedIn) {
+    return (
+      <div className="login-page animate-fade" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <p style={{ color: "#94a3b8" }}>Redirecting to dashboard…</p>
+      </div>
+    );
   }
 
   return (
@@ -110,103 +95,12 @@ export function LoginPage({ onLogin, onBack }: LoginPageProps) {
         <div className="login-logo"><Logo /></div>
         <p className="login-tagline">AI can act. Praxis decides.</p>
 
-        {/* Single Use Demo Account Button (expands role selector so each role logs in separately) */}
-        <div className="demo-live-banner" style={{ marginBottom: "16px" }}>
-          <button
-            type="button"
-            className="demo-live-hero-btn"
-            onClick={() => setShowDemoRoles((prev) => !prev)}
-            disabled={loading}
-            aria-expanded={showDemoRoles}
-            aria-label="Use Demo Account"
-            style={{
-              width: "100%",
-              padding: "12px 16px",
-              fontSize: "0.95rem",
-              fontWeight: 600,
-              background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-              color: "#ffffff",
-              border: "none",
-              borderRadius: "8px",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "8px",
-              boxShadow: "0 4px 12px rgba(16, 185, 129, 0.25)",
-            }}
-          >
-            {demoLoggingIn ? (
-              <>
-                <IconSpinner size={18} /> Signing in to Demo…
-              </>
-            ) : (
-              <>🚀 Use Demo Account {showDemoRoles ? "▲" : "▼"}</>
-            )}
-          </button>
-
-          {showDemoRoles && (
-            <div
-              className="animate-slide-up"
-              style={{
-                marginTop: "10px",
-                padding: "12px",
-                background: "var(--bg-elevated)",
-                border: "1px solid var(--border-subtle)",
-                borderRadius: "8px",
-                display: "flex",
-                flexDirection: "column",
-                gap: "8px",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  color: "var(--text-muted)",
-                }}
-              >
-                Choose a Demo Role (Separate accounts for submit &amp; multi-tier approval):
-              </div>
-              {DEMO_ACCOUNTS.map((acc) => (
-                <button
-                  key={acc.email}
-                  type="button"
-                  onClick={() => void handleDemoLogin(acc.email, acc.password, acc.role)}
-                  disabled={loading}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    width: "100%",
-                    padding: "9px 12px",
-                    background: "var(--bg-surface)",
-                    border: "1px solid var(--border-subtle)",
-                    borderRadius: "6px",
-                    cursor: loading ? "wait" : "pointer",
-                    color: "var(--text-primary)",
-                    fontSize: "13px",
-                    fontWeight: 600,
-                  }}
-                >
-                  <span>{acc.role}</span>
-                  <code style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: 400 }}>
-                    {demoLoggingIn === acc.email ? "Signing in…" : acc.email}
-                  </code>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Clerk Sign In Component (includes Clerk's own Sign Up link in footer) */}
         {PUBLISHABLE_KEY ? (
           <div className="clerk-auth-wrapper" style={{ width: "100%", display: "flex", justifyContent: "center" }}>
             <SignIn
               routing="hash"
               signUpUrl="#/signup"
+              fallbackRedirectUrl="/"
               appearance={clerkAppearance}
             />
           </div>
@@ -222,7 +116,7 @@ export function LoginPage({ onLogin, onBack }: LoginPageProps) {
             }}
           >
             <p style={{ fontSize: "0.88rem", color: "#94a3b8", marginBottom: 0 }}>
-              Click <strong>&quot;Use Demo Account&quot;</strong> above to explore the full dashboard instantly.
+              Clerk authentication is loading. Please verify your internet connection.
             </p>
           </div>
         )}

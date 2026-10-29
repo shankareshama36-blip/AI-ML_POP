@@ -1,14 +1,15 @@
 import { useEffect, useState, type ComponentType } from "react";
 import { getDecisionsCount, pingHealth } from "../api";
+import { type PublicView } from "../components/LandingLayout";
 import {
   IconArrowRight, IconCheckCircle, IconClipboard, IconClock,
   IconCpu, IconLayers, IconSearch, IconShield, IconTrending, IconWrench,
 } from "../components/Icons";
 
-
 interface LandingPageProps {
   onSignIn: () => void;
   onGetStarted: () => void;
+  onNavigate?: (view: PublicView) => void;
 }
 
 type Icon = ComponentType<{ size?: number; className?: string }>;
@@ -39,7 +40,7 @@ const roles: Array<{ title: string; description: string; icon: Icon; level: numb
   { title: "Plant Manager", description: "Provide final safety and financial accountability.", icon: IconShield, level: 4 },
 ];
 
-export function LandingPage({ onSignIn, onGetStarted }: LandingPageProps) {
+export function LandingPage({ onSignIn, onGetStarted, onNavigate }: LandingPageProps) {
   const [decisionCount, setDecisionCount] = useState(0);
 
   useEffect(() => {
@@ -53,11 +54,8 @@ export function LandingPage({ onSignIn, onGetStarted }: LandingPageProps) {
     };
   }, []);
 
-  const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
-
   return (
     <div className="landing-page animate-fade">
-
       <header id="top" className="hero hero-premium hero-centered">
         <div className="hero-orbs" aria-hidden="true">
           <span className="hero-orb hero-orb-1" />
@@ -75,33 +73,101 @@ export function LandingPage({ onSignIn, onGetStarted }: LandingPageProps) {
               Deterministic DFA state verification, multi-objective Dijkstra graph optimization,
               and predictive AI models unified into one accountable decision engine.
             </p>
-            <div className="hero-actions fade-in-up delay-3">
+
+            {/* Phase 3: 3 Distinct SaaS Pricing Cards (Demo, Individual, Business) */}
+            <div className="hero-pathways-grid fade-in-up delay-3">
+              {/* Card 1: Demo (Free Sandbox) */}
+              <div className="hero-pathway-card">
+                <div>
+                  <div className="hero-pathway-header">
+                    <span className="hero-pathway-badge demo">Free Sandbox</span>
+                    <span className="hero-pathway-tag">No Login</span>
+                  </div>
+                  <h3>Try the Sandbox</h3>
+                  <p>
+                    No signup required. Test the AI decision engine instantly with pre-configured roles.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="hero-pathway-btn btn-demo"
+                  onClick={() => (onNavigate ? onNavigate("demo") : onSignIn())}
+                >
+                  Launch Demo <IconArrowRight size={15} />
+                </button>
+              </div>
+
+              {/* Card 2: Individual (30-Day Trial) — Featured */}
+              <div className="hero-pathway-card featured">
+                <div>
+                  <div className="hero-pathway-header">
+                    <span className="hero-pathway-badge individual">30-Day Trial</span>
+                    <span className="hero-pathway-tag" style={{ color: "#60a5fa" }}>Most Popular</span>
+                  </div>
+                  <h3>For Individuals</h3>
+                  <p>
+                    Start governing decisions with formal verification. 30 days free, cancel anytime.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="hero-pathway-btn btn-trial"
+                  onClick={() => (onNavigate ? onNavigate("individual") : onGetStarted())}
+                >
+                  Start Free Trial <IconArrowRight size={15} />
+                </button>
+              </div>
+
+              {/* Card 3: Business (Enterprise) */}
+              <div className="hero-pathway-card">
+                <div>
+                  <div className="hero-pathway-header">
+                    <span className="hero-pathway-badge business">Enterprise</span>
+                    <span className="hero-pathway-tag">Custom SLA</span>
+                  </div>
+                  <h3>For Business</h3>
+                  <p>
+                    Custom roles, multi-tenant isolation, automated audit logging, and enterprise SLA.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="hero-pathway-btn btn-business"
+                  onClick={() => (onNavigate ? onNavigate("business") : onGetStarted())}
+                >
+                  Explore Business <IconArrowRight size={15} />
+                </button>
+              </div>
+            </div>
+
+            {/* Now / Manifesto Link */}
+            <div className="hero-manifesto-row fade-in-up delay-4" style={{ marginTop: "24px", textAlign: "center" }}>
               <button
                 type="button"
-                className="btn-primary btn-lg hero-cta hero-cta-float"
-                onClick={onGetStarted}
+                className="btn-link"
+                onClick={() => (onNavigate ? onNavigate("now") : undefined)}
+                style={{
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  color: "#60a5fa",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "8px 18px",
+                  background: "rgba(37, 99, 235, 0.1)",
+                  border: "1px solid rgba(37, 99, 235, 0.25)",
+                  borderRadius: "999px",
+                  cursor: "pointer",
+                }}
               >
-                Get Started Free <IconArrowRight size={16} />
-              </button>
-              <button
-                type="button"
-                className="btn-ghost btn-lg hero-cta hero-cta-float hero-cta-delay"
-                onClick={onSignIn}
-              >
-                Live Demo &amp; Sign In
-              </button>
-              <button
-                type="button"
-                className="btn-ghost btn-lg hero-cta hero-cta-float hero-cta-delay"
-                onClick={() => scrollTo("how")}
-              >
-                See How It Works
+                📜 Read our Manifesto →
               </button>
             </div>
-            <div className="hero-trust fade-in-up delay-4" aria-label="Platform trust signals">
+
+            <div className="hero-trust fade-in-up delay-4" aria-label="Platform trust signals" style={{ marginTop: "28px" }}>
               <span className="hero-trust-item"><IconCheckCircle size={15} /> DFA Verified</span>
               <span className="hero-trust-item"><IconLayers size={15} /> Dijkstra Optimized</span>
-              <span className="hero-trust-item"><IconCpu size={15} /> AI-Powered</span>
+              <span className="hero-trust-item"><IconCpu size={15} /> Specialized ANI Agent</span>
             </div>
           </div>
 
@@ -142,32 +208,104 @@ export function LandingPage({ onSignIn, onGetStarted }: LandingPageProps) {
       </section>
 
       <section className="section" aria-labelledby="what-title">
-        <div className="section-head"><p className="eyebrow">A decision layer, not another dashboard</p><h2 id="what-title" className="section-title">What is Praxis?</h2><p className="section-sub">A full-lifecycle decision system for high-consequence industrial workflows.</p></div>
-        <div className="grid-3">{features.slice(0, 3).map(({ title, description, icon: FeatureIcon }) => <article className="feature-card" key={title}><div className="feature-icon"><FeatureIcon size={23} /></div><h3 className="feature-title">{title}</h3><p className="feature-desc">{description}</p></article>)}</div>
+        <div className="section-head">
+          <p className="eyebrow">A decision layer, not another dashboard</p>
+          <h2 id="what-title" className="section-title">What is Praxis?</h2>
+          <p className="section-sub">A full-lifecycle decision system for high-consequence industrial workflows.</p>
+        </div>
+        <div className="grid-3">
+          {features.slice(0, 3).map(({ title, description, icon: FeatureIcon }) => (
+            <article className="feature-card" key={title}>
+              <div className="feature-icon"><FeatureIcon size={23} /></div>
+              <h3 className="feature-title">{title}</h3>
+              <p className="feature-desc">{description}</p>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section id="how" className="section section-contrast" aria-labelledby="how-title">
-        <div className="section-head"><p className="eyebrow">From signal to accountable action</p><h2 id="how-title" className="section-title">The Decision Loop</h2><p className="section-sub">Seven deliberate stages turn raw conditions into an authorized operational choice.</p></div>
-        <div className="loop">{loop.map(([label, detail], index) => <div className="loop-fragment" key={label}><article className="loop-step"><span className="loop-num">{index + 1}</span><strong className="loop-label">{label}</strong><span className="loop-detail">{detail}</span></article>{index < loop.length - 1 && <IconArrowRight size={18} className="loop-arrow" aria-hidden="true" />}</div>)}</div>
+        <div className="section-head">
+          <p className="eyebrow">From signal to accountable action</p>
+          <h2 id="how-title" className="section-title">The Decision Loop</h2>
+          <p className="section-sub">Seven deliberate stages turn raw conditions into an authorized operational choice.</p>
+        </div>
+        <div className="loop">
+          {loop.map(([label, detail], index) => (
+            <div className="loop-fragment" key={label}>
+              <article className="loop-step">
+                <span className="loop-num">{index + 1}</span>
+                <strong className="loop-label">{label}</strong>
+                <span className="loop-detail">{detail}</span>
+              </article>
+              {index < loop.length - 1 && <IconArrowRight size={18} className="loop-arrow" aria-hidden="true" />}
+            </div>
+          ))}
+        </div>
       </section>
 
       <section id="features" className="section" aria-labelledby="features-title">
-        <div className="section-head"><p className="eyebrow">Designed for real operating conditions</p><h2 id="features-title" className="section-title">Built for Real Decisions</h2><p className="section-sub">A rigorous foundation for decisions that need to be safe, explainable, and auditable.</p></div>
-        <div className="grid-3">{features.map(({ title, description, icon: FeatureIcon }) => <article className="feature-card" key={title}><div className="feature-icon"><FeatureIcon size={23} /></div><h3 className="feature-title">{title}</h3><p className="feature-desc">{description}</p></article>)}</div>
+        <div className="section-head">
+          <p className="eyebrow">Designed for real operating conditions</p>
+          <h2 id="features-title" className="section-title">Built for Real Decisions</h2>
+          <p className="section-sub">A rigorous foundation for decisions that need to be safe, explainable, and auditable.</p>
+        </div>
+        <div className="grid-3">
+          {features.map(({ title, description, icon: FeatureIcon }) => (
+            <article className="feature-card" key={title}>
+              <div className="feature-icon"><FeatureIcon size={23} /></div>
+              <h3 className="feature-title">{title}</h3>
+              <p className="feature-desc">{description}</p>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section id="academic" className="section section-contrast" aria-labelledby="academic-title">
-        <div className="section-head"><p className="eyebrow">Technical rigor by design</p><h2 id="academic-title" className="section-title">Academic Foundation</h2><p className="section-sub">Three disciplines working together to make choices reliable under pressure.</p></div>
+        <div className="section-head">
+          <p className="eyebrow">Technical rigor by design</p>
+          <h2 id="academic-title" className="section-title">Academic Foundation</h2>
+          <p className="section-sub">Three disciplines working together to make choices reliable under pressure.</p>
+        </div>
         <div className="academic-grid">
-          <article className="academic-card flat"><span className="subject-badge">FLAT</span><h3>Formal language validation</h3><p>A deterministic finite automaton validates every request before it reaches the decision engine. Invalid states stop early, predictably, and with a traceable reason.</p></article>
-          <article className="academic-card aiml"><span className="subject-badge">AI-ML</span><h3>Predictive modeling</h3><p>Offline-trained models estimate downtime, cost, and risk for each candidate action. Predictions remain inputs to a governed decision, never an unchecked command.</p></article>
-          <article className="academic-card daa"><span className="subject-badge">DAA</span><h3>Graph optimization</h3><p>Shortest-path optimization compares feasible choices over a multi-objective cost surface. The result is the globally lowest-scoring action that still satisfies hard constraints.</p></article>
+          <article className="academic-card flat">
+            <span className="subject-badge">FLAT</span>
+            <h3>Formal language validation</h3>
+            <p>A deterministic finite automaton validates every request before it reaches the decision engine. Invalid states stop early, predictably, and with a traceable reason.</p>
+          </article>
+          <article className="academic-card aiml">
+            <span className="subject-badge">AI-ML</span>
+            <h3>Predictive modeling</h3>
+            <p>Offline-trained models estimate downtime, cost, and risk for each candidate action. Predictions remain inputs to a governed decision, never an unchecked command.</p>
+          </article>
+          <article className="academic-card daa">
+            <span className="subject-badge">DAA</span>
+            <h3>Graph optimization</h3>
+            <p>Shortest-path optimization compares feasible choices over a multi-objective cost surface. The result is the globally lowest-scoring action that still satisfies hard constraints.</p>
+          </article>
         </div>
       </section>
 
       <section id="team" className="section" aria-labelledby="team-title">
-        <div className="section-head"><p className="eyebrow">One shared source of operational truth</p><h2 id="team-title" className="section-title">Built for the Whole Team</h2><p className="section-sub">Purpose-built views support each level of responsibility without losing the decision context.</p></div>
-        <div className="role-grid">{roles.map(({ title, description, icon: RoleIcon, level }) => <article className="role-card" key={title}><div className="role-top"><RoleIcon size={22} /><span className="role-level" aria-label={`Approval level ${level}`}>{Array.from({ length: level }, (_, index) => <i key={index} />)}</span></div><h3>{title}</h3><p>{description}</p></article>)}</div>
+        <div className="section-head">
+          <p className="eyebrow">One shared source of operational truth</p>
+          <h2 id="team-title" className="section-title">Built for the Whole Team</h2>
+          <p className="section-sub">Purpose-built views support each level of responsibility without losing the decision context.</p>
+        </div>
+        <div className="role-grid">
+          {roles.map(({ title, description, icon: RoleIcon, level }) => (
+            <article className="role-card" key={title}>
+              <div className="role-top">
+                <RoleIcon size={22} />
+                <span className="role-level" aria-label={`Approval level ${level}`}>
+                  {Array.from({ length: level }, (_, index) => <i key={index} />)}
+                </span>
+              </div>
+              <h3>{title}</h3>
+              <p>{description}</p>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section className="cta-final" aria-labelledby="cta-title">
@@ -177,13 +315,15 @@ export function LandingPage({ onSignIn, onGetStarted }: LandingPageProps) {
           <IconClock size={14} />
           <span>{decisionCount.toLocaleString()} decisions made</span>
         </div>
-        <div>
-          <button type="button" className="btn-primary cta-button" onClick={onGetStarted}>
-            Get Started Free <IconArrowRight size={18} />
+        <div style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap", marginTop: "16px" }}>
+          <button type="button" className="btn-primary cta-button" onClick={() => (onNavigate ? onNavigate("individual") : onGetStarted())}>
+            Start Free 30-Day Trial <IconArrowRight size={18} />
+          </button>
+          <button type="button" className="btn-ghost cta-button" onClick={() => (onNavigate ? onNavigate("business") : onGetStarted())}>
+            Explore Business Plan <IconArrowRight size={18} />
           </button>
         </div>
       </section>
-
     </div>
   );
 }

@@ -1,9 +1,13 @@
+import type { CSSProperties } from "react";
+
 export interface IconProps {
   size?: number;
   className?: string;
+  color?: string;
+  style?: CSSProperties;
 }
 
-export function IconLock({ size = 16, className = "" }: IconProps) {
+export function IconLock({ size = 16, className = "", color, style }: IconProps) {
   return (
     <svg
       width={size}
@@ -15,6 +19,7 @@ export function IconLock({ size = 16, className = "" }: IconProps) {
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
+      style={{ color, ...style }}
     >
       <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
       <path d="M7 11V7a5 5 0 0 1 10 0v4" />
@@ -140,7 +145,7 @@ export function IconX({ size = 16, className = "" }: IconProps) {
   );
 }
 
-export function IconClock({ size = 16, className = "" }: IconProps) {
+export function IconClock({ size = 16, className = "", color, style }: IconProps) {
   return (
     <svg
       width={size}
@@ -152,6 +157,7 @@ export function IconClock({ size = 16, className = "" }: IconProps) {
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
+      style={{ color, ...style }}
     >
       <circle cx="12" cy="12" r="10" />
       <polyline points="12 6 12 12 16 14" />
@@ -235,7 +241,7 @@ export function IconTrending({ size = 16, className = "" }: IconProps) {
   );
 }
 
-export function IconShield({ size = 16, className = "" }: IconProps) {
+export function IconShield({ size = 16, className = "", color, style }: IconProps) {
   return (
     <svg
       width={size}
@@ -247,13 +253,14 @@ export function IconShield({ size = 16, className = "" }: IconProps) {
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
+      style={{ color, ...style }}
     >
       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
     </svg>
   );
 }
 
-export function IconCheckCircle({ size = 16, className = "" }: IconProps) {
+export function IconCheckCircle({ size = 16, className = "", color, style }: IconProps) {
   return (
     <svg
       width={size}
@@ -265,6 +272,7 @@ export function IconCheckCircle({ size = 16, className = "" }: IconProps) {
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
+      style={{ color, ...style }}
     >
       <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
       <polyline points="22 4 12 14.01 9 11.01" />
@@ -670,7 +678,92 @@ export function AILogo({ size = 24, className = "" }: IconProps) {
   );
 }
 
+export function IconSliders({ size = 16, className = "", color, style }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      style={{ color, ...style }}
+    >
+      <line x1="4" y1="21" x2="4" y2="14" />
+      <line x1="4" y1="10" x2="4" y2="3" />
+      <line x1="12" y1="21" x2="12" y2="12" />
+      <line x1="12" y1="8" x2="12" y2="3" />
+      <line x1="20" y1="21" x2="20" y2="16" />
+      <line x1="20" y1="12" x2="20" y2="3" />
+      <line x1="1" y1="14" x2="7" y2="14" />
+      <line x1="9" y1="8" x2="15" y2="8" />
+      <line x1="17" y1="16" x2="23" y2="16" />
+    </svg>
+  );
+}
 
+export function IconZap({ size = 16, className = "", color, style }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      style={{ color, ...style }}
+    >
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+    </svg>
+  );
+}
 
+export function IconSparkles({ size = 16, className = "", color, style }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      style={{ color, ...style }}
+    >
+      <path d="M12 3v18" />
+      <path d="M3 12h18" />
+      <path d="m5.5 5.5 13 13" />
+      <path d="m18.5 5.5-13 13" />
+    </svg>
+  );
+}
 
-
+export function IconUsers({ size = 16, className = "", color, style }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      style={{ color, ...style }}
+    >
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}

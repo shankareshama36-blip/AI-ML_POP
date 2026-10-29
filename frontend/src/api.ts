@@ -1,4 +1,7 @@
-const BASE = import.meta.env.VITE_API_BASE_URL || "/api";
+// In production or when VITE_API_BASE_URL is provided, use that URL.
+// In local development, use relative "/api" forwarded by Vite proxy to http://127.0.0.1:8000.
+export const VITE_API_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim().replace(/\/+$/, "");
+const BASE = VITE_API_BASE || "/api";
 
 export interface User {
   id: number;
@@ -153,10 +156,13 @@ export interface AuthResult {
 
 export class ApiError extends Error {
   status: number;
+  detail?: unknown;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, detail?: unknown) {
     super(message);
+    this.name = "ApiError";
     this.status = status;
+    this.detail = detail;
   }
 }
 
@@ -198,10 +204,10 @@ function endRequestTimer() {
 export async function fetchWithTimeout(
   url: string,
   options: RequestInit = {},
-  timeoutMs = 60000
+  timeoutMs = 15000
 ): Promise<Response> {
-  const isHealthCheck = url.includes("/health");
-  if (!isHealthCheck) startRequestTimer();
+  const isSilent = url.includes("/health") || url.includes("/analytics/decisions-count");
+  if (!isSilent) startRequestTimer();
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -227,15 +233,32 @@ export async function fetchWithTimeout(
     throw error;
   } finally {
     clearTimeout(timeoutId);
-    if (!isHealthCheck) endRequestTimer();
+    if (!isSilent) endRequestTimer();
   }
 }
 
-export async function pingHealth(): Promise<boolean> {
+export async function pingHealth(timeoutMs = 10000): Promise<boolean> {
   try {
-    const res = await fetchWithTimeout(`${BASE}/health`, { method: "GET" }, 15000);
-    return res.ok;
+    const res = await fetchWithTimeout(`${BASE}/health`, { method: "GET" }, timeoutMs);
+    if (res.ok) return true;
+    if (res.status === 503 && !VITE_API_BASE && typeof window !== "undefined") {
+      try {
+        const direct = await fetchWithTimeout(`http://127.0.0.1:8000/health`, { method: "GET" }, timeoutMs);
+        return direct.ok;
+      } catch {
+        return false;
+      }
+    }
+    return false;
   } catch {
+    if (!VITE_API_BASE && typeof window !== "undefined") {
+      try {
+        const direct = await fetchWithTimeout(`http://127.0.0.1:8000/health`, { method: "GET" }, timeoutMs);
+        return direct.ok;
+      } catch {
+        return false;
+      }
+    }
     return false;
   }
 }
@@ -247,7 +270,7 @@ export function setClerkTokenGetter(getter: TokenGetter | null) {
   clerkTokenGetter = getter;
 }
 
-async function request<T>(path: string, options: RequestInit = {}, timeoutMs = 60000): Promise<T> {
+async function request<T>(path: string, options: RequestInit = {}, timeoutMs = 15000): Promise<T> {
   let token: string | null = null;
   if (clerkTokenGetter) {
     try {
@@ -263,39 +286,68 @@ async function request<T>(path: string, options: RequestInit = {}, timeoutMs = 6
   headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  const maxRetries = 2;
+  const maxRetries = 1;
   let lastError: unknown = null;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const res = await fetchWithTimeout(`${BASE}${path}`, { ...options, headers }, timeoutMs);
+      let res = await fetchWithTimeout(`${BASE}${path}`, { ...options, headers }, timeoutMs);
 
-      // Render free-tier cold start retry on gateway errors
-      if ((res.status === 502 || res.status === 503 || res.status === 504) && attempt < maxRetries) {
-        await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)));
-        continue;
+      // Render free-tier cold start retry or local dev proxy fallback
+      if ((res.status === 502 || res.status === 503 || res.status === 504)) {
+        if (res.status === 503 && !VITE_API_BASE && typeof window !== "undefined") {
+          try {
+            const directRes = await fetchWithTimeout(`http://127.0.0.1:8000${path}`, { ...options, headers }, timeoutMs);
+            if (directRes.ok || directRes.status < 500) {
+              res = directRes;
+            }
+          } catch {
+            // direct fallback failed, proceed with retry
+          }
+        }
+        if (res.status >= 500 && attempt < maxRetries) {
+          await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)));
+          continue;
+        }
       }
 
       if (!res.ok) {
         const body = await res.text();
+        let extractedMessage = `HTTP ${res.status}: ${res.statusText || "Request failed"}`;
+        let parsedDetail: unknown = undefined;
+
         try {
-          const parsed = JSON.parse(body) as { detail?: unknown };
-          let detailMessage = body;
-          if (typeof parsed.detail === "string") {
-            detailMessage = parsed.detail;
-          } else if (Array.isArray(parsed.detail) && parsed.detail.length > 0) {
-            const first = parsed.detail[0] as { msg?: string };
-            if (first && typeof first.msg === "string") {
-              detailMessage = first.msg.replace(/^Value error,\s*/i, "");
+          const parsed = JSON.parse(body);
+          if (parsed && typeof parsed === "object") {
+            if ("detail" in parsed) {
+              parsedDetail = parsed.detail;
+              if (typeof parsed.detail === "string") {
+                extractedMessage = parsed.detail;
+              } else if (Array.isArray(parsed.detail) && parsed.detail.length > 0) {
+                const first = parsed.detail[0];
+                if (first && typeof first === "object" && "msg" in first && typeof first.msg === "string") {
+                  extractedMessage = first.msg.replace(/^Value error,\s*/i, "");
+                } else {
+                  extractedMessage = JSON.stringify(parsed.detail);
+                }
+              } else if (parsed.detail && typeof parsed.detail === "object" && "message" in parsed.detail) {
+                extractedMessage = String((parsed.detail as { message: unknown }).message);
+              } else {
+                extractedMessage = JSON.stringify(parsed.detail);
+              }
+            } else if ("message" in parsed && typeof parsed.message === "string") {
+              extractedMessage = parsed.message;
+            } else if ("error" in parsed && typeof parsed.error === "string") {
+              extractedMessage = parsed.error;
             }
-          } else if (parsed.detail && typeof parsed.detail === "object" && "message" in parsed.detail) {
-            detailMessage = String((parsed.detail as { message: unknown }).message);
           }
-          throw new ApiError(res.status, detailMessage || body);
-        } catch (error) {
-          if (error instanceof ApiError) throw error;
-          throw new ApiError(res.status, body);
+        } catch {
+          if (body && body.trim().length > 0) {
+            extractedMessage = body;
+          }
         }
+
+        throw new ApiError(res.status, extractedMessage, parsedDetail);
       }
       if (res.status === 204) {
         return undefined as T;
@@ -315,7 +367,7 @@ async function request<T>(path: string, options: RequestInit = {}, timeoutMs = 6
     }
   }
 
-  throw lastError;
+  throw lastError ?? new Error("Request failed. Please try again.");
 }
 
 export type UserRole =
@@ -599,6 +651,25 @@ export async function chatWithExplorer(
     }),
   });
 }
+
+export async function demoChatWithExplorer(
+  messages: ChatMessageInput[],
+  decision_context?: string,
+  details?: ChatContextDetails
+): Promise<ExplorerChatResult> {
+  return request<ExplorerChatResult>("/explorer/demo-chat", {
+    method: "POST",
+    body: JSON.stringify({
+      messages,
+      decision_context,
+      title: details?.title,
+      options: details?.options,
+      constraints: details?.constraints,
+      recommended_option: details?.recommended_option,
+    }),
+  });
+}
+
 
 
 

@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC
 from uuid import UUID
 
 from fastapi.testclient import TestClient
@@ -188,3 +189,72 @@ def test_production_mode_rejects_unverified_clerk_token(monkeypatch):
     # Request with arbitrary unverified token in production must fail with 500/401, not 200
     res = client.post("/auth/verify", headers={"Authorization": "Bearer fake.unverified.token"})
     assert res.status_code in (401, 500)
+
+
+def test_submitter_self_approval_blocked():
+    import pytest
+
+    from backend.app.complaints import approve_complaint
+
+    clients = _setup_security_fixtures()
+    tech_a = clients["tech_a"]
+
+    # 1. Endpoint level: Maintenance supervisor cannot even submit complaint (403 role separation)
+    maint_a = clients["maint_a"]
+    comp_403 = maint_a.post("/complaints", json={"machine_id": "M-102", "problem_type": "Overheat", "severity": "HIGH"})
+    assert comp_403.status_code == 403
+
+    # 2. Technician submits complaint
+    comp_res = tech_a.post("/complaints", json={"machine_id": "M-102", "problem_type": "Overheat", "severity": "HIGH"})
+    assert comp_res.status_code == 201
+    comp_id = comp_res.json()["complaint_id"]
+
+    # 3. Technician cannot approve their own complaint via API (403 role restriction)
+    tech_appr = tech_a.post(f"/complaints/{comp_id}/approve", json={"comment": "Self approval"})
+    assert tech_appr.status_code == 403
+
+    # 4. Complaints engine internal safeguard: even if called directly with supervisor role, submitter identity is blocked
+    with pytest.raises(ValueError, match="Submitter cannot approve"):
+        approve_complaint(
+            complaint_id=uuid.UUID(comp_id),
+            username="tech-sec-a@example.com",
+            role="maintenance_supervisor",
+            tenant_id="11111111-1111-1111-1111-111111111111",
+        )
+
+
+def test_decision_self_approval_blocked():
+    clients = _setup_security_fixtures()
+    maint_a = clients["maint_a"]
+
+    # Maint supervisor creates a decision
+    dec_res = maint_a.post("/decisions/evaluate", json=DECISION_PAYLOAD)
+    assert dec_res.status_code == 201
+    dec_id = dec_res.json()["decision"]["decision_id"]
+
+    # Maint supervisor tries to self-approve it
+    appr_res = maint_a.post(f"/decisions/{dec_id}/approval", json={"status": "APPROVED", "approver_id": "maint-sec-a"})
+    assert appr_res.status_code == 409
+    assert "submitter cannot approve" in appr_res.json()["detail"].lower()
+
+
+def test_clerk_auto_provisioning_uses_default_tenant():
+    from datetime import datetime, timedelta
+
+    from jose import jwt
+
+    from backend.app.config import DEFAULT_TENANT_ID, DEFAULT_WORKSPACE_NAME
+
+    init_db()
+    unique_sub = f"clerk_sub_{uuid.uuid4().hex[:8]}"
+    email = f"user_{uuid.uuid4().hex[:6]}@example.com"
+    exp = datetime.now(UTC) + timedelta(hours=1)
+    fake_token = jwt.encode({"sub": unique_sub, "email": email, "exp": exp}, "secret", algorithm="HS256")
+
+    res = client.post("/auth/verify", headers={"Authorization": f"Bearer {fake_token}"})
+    assert res.status_code == 200
+    user_data = res.json()["user"]
+    assert user_data["tenant_id"] == DEFAULT_TENANT_ID
+    assert user_data["role"] == "explorer"
+    assert user_data["company_name"] == DEFAULT_WORKSPACE_NAME
+

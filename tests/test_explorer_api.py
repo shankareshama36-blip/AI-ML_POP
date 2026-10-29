@@ -141,4 +141,33 @@ def test_explorer_chat_suggested_prompts() -> None:
         assert expected_keyword.lower() in reply.lower()
 
 
+def test_explorer_chat_ani_refusal_for_general_questions() -> None:
+    app.state.limiter.reset()
+    payload = {
+        "messages": [
+            {"role": "user", "content": "Who is the president of the United States?"}
+        ],
+        "decision_context": "Comparing AWS vs GCP",
+    }
+    response = client.post("/explorer/chat", json=payload)
+    assert response.status_code == 200
+    reply = response.json()["reply"]
+    assert "specialized Decision ANI" in reply
+    assert "only assist with operational decisions and constraint analysis" in reply
 
+
+def test_explorer_demo_chat_unauthenticated() -> None:
+    app.state.limiter.reset()
+    payload = {
+        "messages": [
+            {"role": "user", "content": "How do constraints affect the optimal recommendation?"}
+        ],
+        "decision_context": "Comparing Machine Tooling Options",
+    }
+    # Notice this is unauth_client without Authorization header!
+    response = unauth_client.post("/explorer/demo-chat", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert "reply" in data
+    assert data["model_used"] == "praxis-ai-engine"
+    assert len(data["reply"]) > 10

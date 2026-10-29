@@ -26,12 +26,10 @@ PRAXIS_SYSTEM_INSTRUCTION = (
 )
 
 PRAXIS_CHAT_SYSTEM_INSTRUCTION = (
-    "You are Praxis, a friendly and highly intelligent AI decision assistant. "
-    "If the user greets you (e.g., 'hi', 'hello'), greet them back warmly and ask how you can help with their decision. "
-    "If the user asks a question about the decision, use the provided context to answer clearly. "
-    "Do NOT repeat the decision title or constraints unless the user specifically asks for them. "
-    "Keep your tone natural, human-like, and helpful. "
-    "Never say 'As an AI' or 'As Gemini', and never mention Gemini or Google."
+    "You are Praxis, a specialized ANI Decision Agent. You do NOT answer general knowledge questions, write code, or chat casually. "
+    "You ONLY analyze constraints, evaluate options, and explain decision logic based on formal verification and DFA rules. "
+    "If a user asks a general question (like 'Who is the president?'), you must reply: "
+    "'I am a specialized Decision ANI. I can only assist with operational decisions and constraint analysis.'"
 )
 
 
@@ -141,16 +139,16 @@ def _resolve_decision_context(payload: ExplorerChatRequest) -> dict[str, str]:
 
 def _build_chat_system_instruction(ctx: dict[str, str]) -> str:
     return (
-        "You are Praxis, an AI decision assistant.\n"
-        "Below is the context of the user's decision:\n"
+        "You are Praxis, a specialized ANI Decision Agent. You do NOT answer general knowledge questions, write code, or chat casually. "
+        "You ONLY analyze constraints, evaluate options, and explain decision logic based on formal verification and DFA rules.\n"
+        "If a user asks a general question (like 'Who is the president?' or trivia/code), you must reply: "
+        "'I am a specialized Decision ANI. I can only assist with operational decisions and constraint analysis.'\n\n"
+        "Decision Context:\n"
         f"Title: {ctx['title']}\n"
         f"Options: {ctx['options']}\n"
         f"Constraints: {ctx['constraints']}\n"
         f"The AI recommended: {ctx['recommended_option']}.\n"
-        "Your job is to answer the user's follow-up questions conversationally.\n"
-        "If the user simply greets you (e.g., 'Hi', 'Hello', 'Hey'), respond warmly and conversationally without repeating the decision summary.\n"
-        "If they ask 'why not [Option X]', explain the mathematical reasons based on the constraints (cost, risk, etc.).\n"
-        "Do NOT repeat the generic summary. Answer the specific question directly and naturally.\n"
+        "Answer operational decision questions with mathematical rigor. "
         "Never say 'As an AI' or 'As Gemini', and never mention Gemini or Google."
     )
 
@@ -159,6 +157,16 @@ def _generate_fallback_chat_reply(last_user_message: str, ctx: dict[str, str]) -
     cleaned = last_user_message.strip()
     lowered = cleaned.lower()
     lowered_clean = lowered.rstrip(".,!?")
+
+    # Strict ANI refusal on general knowledge / trivia / programming / casual queries
+    general_queries = [
+        "president", "prime minister", "capital of", "weather", "tell me a joke",
+        "write code", "write a python", "write a script", "write a poem", "story",
+        "who is ", "who was ", "who won", "population of", "how tall", "how old",
+        "movie", "song", "recipe", "football", "cricket", "basketball",
+    ]
+    if any(q in lowered for q in general_queries):
+        return "I am a specialized Decision ANI. I can only assist with operational decisions and constraint analysis."
 
     # Greetings
     greetings = {
@@ -278,17 +286,7 @@ def analyze_decision(
         )
 
 
-@router.post(
-    "/explorer/chat",
-    response_model=ExplorerChatResponse,
-    status_code=status.HTTP_200_OK,
-)
-@limiter.limit("5/minute")
-def chat_decision(
-    request: Request,
-    payload: ExplorerChatRequest,
-    current_user: User = Depends(get_current_user),
-) -> ExplorerChatResponse:
+def _handle_chat_logic(payload: ExplorerChatRequest) -> ExplorerChatResponse:
     if not payload.messages:
         return ExplorerChatResponse(
             reply="Please provide a message to chat with Praxis.",
@@ -309,11 +307,6 @@ def chat_decision(
         model = genai.GenerativeModel(model_name, system_instruction=sys_inst)
 
         # Build contents array in standard Gemini format:
-        # contents = [
-        #   {"role": "user", "parts": ["[First Question]"]},
-        #   {"role": "model", "parts": ["[First Answer]"]},
-        #   {"role": "user", "parts": ["why not macbook pro m5"]}
-        # ]
         contents = []
         for msg in payload.messages:
             role = "user" if msg.role == "user" else "model"
@@ -341,3 +334,36 @@ def chat_decision(
         logger.warning("AI Engine chat failed (%s); returning fallback reply", exc)
         reply = _generate_fallback_chat_reply(last_user_msg, ctx)
         return ExplorerChatResponse(reply=reply, model_used="praxis-ai-engine")
+
+
+@router.post(
+    "/explorer/chat",
+    response_model=ExplorerChatResponse,
+    status_code=status.HTTP_200_OK,
+)
+@limiter.limit("10/minute")
+def chat_decision(
+    request: Request,
+    payload: ExplorerChatRequest,
+    current_user: User = Depends(get_current_user),
+) -> ExplorerChatResponse:
+    """Authenticated decision chat endpoint for logged-in operators."""
+    return _handle_chat_logic(payload)
+
+
+@router.post(
+    "/explorer/demo-chat",
+    response_model=ExplorerChatResponse,
+    status_code=status.HTTP_200_OK,
+)
+@limiter.limit("10/minute")
+def demo_chat_decision(
+    request: Request,
+    payload: ExplorerChatRequest,
+) -> ExplorerChatResponse:
+    """Public limit-restricted demo chat endpoint.
+
+    Does not require authentication or persist conversations to the database.
+    """
+    return _handle_chat_logic(payload)
+

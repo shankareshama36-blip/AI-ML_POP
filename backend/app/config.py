@@ -35,6 +35,17 @@ CLERK_PUBLISHABLE_KEY = os.getenv(
 )
 CLERK_WEBHOOK_SECRET = os.getenv("CLERK_WEBHOOK_SECRET", "")
 
+# Default shared tenant configuration for auto-provisioned Clerk users
+DEFAULT_TENANT_ID = os.getenv(
+    "DEFAULT_TENANT_ID", "00000000-0000-0000-0000-000000000001"
+)
+DEFAULT_WORKSPACE_NAME = os.getenv(
+    "DEFAULT_WORKSPACE_NAME", "Praxis Main Plant"
+)
+
+if ENV == "production" and not CLERK_SECRET_KEY:
+    raise RuntimeError("CLERK_SECRET_KEY must be configured in production")
+
 # Always include known production frontend origins so the app works
 # regardless of what ALLOWED_ORIGINS env var is set to on the host.
 _PRODUCTION_ORIGINS = [

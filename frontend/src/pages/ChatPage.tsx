@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, type FormEvent } from "react";
 import { chatWithExplorer, type User, type ChatMessageInput } from "../api";
+import { useScrollRestoration } from "../hooks/useScrollRestoration";
 import {
   AILogo,
   IconLogout,
@@ -61,6 +62,7 @@ const SUGGESTED_PROMPTS = [
   "Why was this chosen?",
   "Compare top 2 options",
   "What if budget was higher?",
+  "Explain DFA rule verification",
 ];
 
 function loadSavedChatContext(): SavedChatContext | null {
@@ -75,25 +77,55 @@ function loadSavedChatContext(): SavedChatContext | null {
   return null;
 }
 
+function loadSavedMessages(ctx: SavedChatContext | null): ChatMessageInput[] {
+  try {
+    const raw = sessionStorage.getItem("praxis-chat-messages");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed as ChatMessageInput[];
+      }
+    }
+  } catch {
+    // Ignore storage parse error
+  }
+  const greeting = ctx?.title
+    ? `Hello! I am Praxis, a specialized ANI Decision Agent. I have your operational context loaded for "${ctx.title}". How can I assist with constraint satisfaction or Pareto optimization?`
+    : "Hello! I am Praxis, a specialized ANI Decision Agent. I evaluate operational constraints, calculate trade-offs, and verify decision state machines. How can I assist with your operational decision?";
+  return [{ role: "assistant", content: greeting }];
+}
+
 export function ChatPage({ user, onBack, onLogout }: ChatPageProps) {
   const { showToast } = useToast();
+  useScrollRestoration("praxis-chat-scroll-pos");
+
   const [decisionContext] = useState<SavedChatContext | null>(() => loadSavedChatContext());
-  const [messages, setMessages] = useState<ChatMessageInput[]>(() => {
-    const ctx = loadSavedChatContext();
-    const greeting = ctx?.title
-      ? `Hello! I am Praxis, your AI decision assistant. I have your context ready for "${ctx.title}". How can I help you explore or refine this decision?`
-      : "Hello! I am Praxis, your AI decision assistant. How can I help you today?";
-    return [{ role: "assistant", content: greeting }];
-  });
+  const [messages, setMessages] = useState<ChatMessageInput[]>(() =>
+    loadSavedMessages(loadSavedChatContext())
+  );
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const isFirstMountRef = useRef(true);
 
-  // Auto-scroll to bottom of messages
+  // Persist messages across reloads
   useEffect(() => {
+    try {
+      sessionStorage.setItem("praxis-chat-messages", JSON.stringify(messages));
+    } catch {
+      // Ignore storage error
+    }
+  }, [messages]);
+
+  // Auto-scroll to bottom of messages only on subsequent messages or loading
+  useEffect(() => {
+    if (isFirstMountRef.current) {
+      isFirstMountRef.current = false;
+      return;
+    }
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
@@ -279,7 +311,7 @@ export function ChatPage({ user, onBack, onLogout }: ChatPageProps) {
             ← Back to Playground
           </button>
           <div style={{ height: "18px", width: "1px", background: "var(--border-subtle)" }} />
-          {/* Spark Logo + Praxis AI */}
+          {/* Spark Logo + Praxis ANI */}
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <AILogo size={22} />
             <span
@@ -290,7 +322,21 @@ export function ChatPage({ user, onBack, onLogout }: ChatPageProps) {
                 color: "var(--text-primary)",
               }}
             >
-              Praxis AI
+              Praxis ANI
+            </span>
+            <span
+              style={{
+                fontSize: "11px",
+                fontWeight: 600,
+                padding: "2px 8px",
+                borderRadius: "4px",
+                background: "rgba(37, 99, 235, 0.15)",
+                color: "#60a5fa",
+                border: "1px solid rgba(37, 99, 235, 0.3)",
+                letterSpacing: "0.02em",
+              }}
+            >
+              Specialized Decision Agent
             </span>
           </div>
           {decisionContext?.title && (
