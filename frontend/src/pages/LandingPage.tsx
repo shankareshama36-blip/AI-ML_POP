@@ -10,6 +10,7 @@ import { AcademicEvidenceBoard } from "../components/AcademicEvidenceBoard";
 interface LandingPageProps {
   onSignIn: () => void;
   onGetStarted: () => void;
+  onOpenApp?: () => void;
   onNavigate?: (view: PublicView) => void;
 }
 
@@ -41,7 +42,7 @@ const roles: Array<{ title: string; description: string; icon: Icon; level: numb
   { title: "Plant Manager", description: "Provide final safety and financial accountability.", icon: IconShield, level: 4 },
 ];
 
-export function LandingPage({ onSignIn, onGetStarted, onNavigate }: LandingPageProps) {
+export function LandingPage({ onSignIn, onGetStarted, onOpenApp, onNavigate }: LandingPageProps) {
   const [decisionCount, setDecisionCount] = useState(0);
 
   useEffect(() => {
@@ -75,7 +76,7 @@ export function LandingPage({ onSignIn, onGetStarted, onNavigate }: LandingPageP
               and predictive AI models unified into one accountable decision engine.
             </p>
 
-            {/* The ONLY two Hero buttons: Evaluator Access and Login / Sign Up */}
+            {/* Core Action Buttons: Evaluator Access, Open App, Log In, and Sign Up */}
             <div className="hero-evaluator-cta-row fade-in-up delay-3">
               <button
                 type="button"
@@ -86,10 +87,24 @@ export function LandingPage({ onSignIn, onGetStarted, onNavigate }: LandingPageP
               </button>
               <button
                 type="button"
+                className="btn-hero-open-app"
+                onClick={onOpenApp}
+              >
+                🚀 Open App <IconArrowRight size={16} />
+              </button>
+              <button
+                type="button"
                 className="btn-hero-login"
                 onClick={onSignIn}
               >
-                Login / Sign Up
+                Log In
+              </button>
+              <button
+                type="button"
+                className="btn-hero-signup"
+                onClick={onGetStarted}
+              >
+                Sign Up
               </button>
             </div>
 

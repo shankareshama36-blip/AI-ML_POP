@@ -43,7 +43,23 @@ function AppRoutes() {
   const { signOut } = useClerk();
   const navigate = useNavigate();
   const location = useLocation();
-  const [demoUser, setDemoUser] = useState<User | null>(null);
+  const [demoUser, setDemoUser] = useState<User | null>(() => {
+    if (typeof window === "undefined") return null;
+    const isEval = localStorage.getItem("praxis-evaluator-mode") === "true";
+    const path = window.location.pathname;
+    if (isEval || path === "/app" || path === "/explorer") {
+      return {
+        id: 4,
+        email: "plant@praxis.local",
+        role: "plant_manager",
+        tenant_id: "00000000-0000-0000-0000-000000000001",
+        company_name: "Praxis Main Plant",
+        is_admin: true,
+        is_evaluator: true,
+      };
+    }
+    return null;
+  });
   const [switchingDemo, setSwitchingDemo] = useState<string | null>(null);
   const clerkAppUser = useMemo<User>(() => ({ id: 1, email: clerkUser?.primaryEmailAddress?.emailAddress || `${userId || "user"}@clerk.user`, role: (clerkUser?.publicMetadata?.role as string) || "explorer", tenant_id: "00000000-0000-0000-0000-000000000001", company_name: "Praxis Main Plant", is_admin: Boolean(clerkUser?.publicMetadata?.role === "plant_manager" || clerkUser?.publicMetadata?.role === "business_owner"), clerk_user_id: userId || undefined }), [clerkUser, userId]);
   const user = clerkIsSignedIn ? clerkAppUser : demoUser;
@@ -137,9 +153,17 @@ function AppRoutes() {
     }
   }, [navigate, switchingDemo]);
 
+  const handleOpenApp = useCallback(async () => {
+    if (user) {
+      navigate(dashboardPath);
+      return;
+    }
+    await handleSuperAdminLogin();
+  }, [dashboardPath, handleSuperAdminLogin, navigate, user]);
+
   const switchDemo = useCallback(async (email: string, pass: string) => { if (switchingDemo) return; setSwitchingDemo(email); try { const result = await login(email, pass, true); setDemoUser(result.user); if (location.pathname === "/settings" && result.user.role !== "plant_manager") navigate("/app", { replace: true }); } finally { setSwitchingDemo(null); } }, [location.pathname, navigate, switchingDemo]);
   const goPublic = useCallback((view: PublicView) => navigate(PUBLIC_PATHS[view]), [navigate]);
-  const publicPage = (view: PublicView, child: ReactNode) => <LandingLayout currentView={view} onNavigate={goPublic} onSignIn={() => navigate("/login")} onGetStarted={() => navigate("/signup")}>{child}</LandingLayout>;
+  const publicPage = (view: PublicView, child: ReactNode) => <LandingLayout currentView={view} onNavigate={goPublic} onSignIn={() => navigate("/login")} onGetStarted={() => navigate("/signup")} onOpenApp={handleOpenApp}>{child}</LandingLayout>;
   const dashboard = user && (["technician", "researcher", "explorer", "creator"].includes(user.role) ? <TechnicianPage user={user} onLogout={handleLogout} onOpenSettings={canAccessSettings ? () => navigate("/settings") : undefined} /> : <ApproverPage user={user} onLogout={handleLogout} onOpenSettings={canAccessSettings ? () => navigate("/settings") : undefined} />);
 
   if (!isLoaded) return <div className="app-loading-screen">Connecting to secure session…</div>;
@@ -177,7 +201,7 @@ function AppRoutes() {
     )}
     {user && <div className="workspace-switcher-bar" role="navigation"><div className="workspace-switcher-left">{isEvaluator && <span className="evaluator-mode-pill">🎓 Evaluator Mode (Super Admin)</span>}<button type="button" className="ws-nav-pill" onClick={() => navigate("/explorer")}>🧭 Customizable AI Playground</button><button type="button" className="ws-nav-pill" onClick={() => navigate("/app")}>🏭 Factory Operations</button><button type="button" className="ws-nav-pill" onClick={() => navigate("/chat")}>💬 AI Assistant</button>{canAccessSettings && <button type="button" className="ws-nav-pill" onClick={() => navigate("/settings")}>⚙️ Settings</button>}</div><div className="workspace-switcher-right">{isEvaluator ? (<div className="evaluator-navbar-role-wrap"><label htmlFor="eval-nav-role-select" className="eval-navbar-label">Role Switcher:</label><select id="eval-nav-role-select" className="eval-navbar-select" value={user.role} disabled={Boolean(switchingDemo)} onChange={(e) => void handleEvaluatorRoleSwitch(e.target.value)}><option value="plant_manager">🛡️ Manager</option><option value="technician">🏭 Technician</option><option value="explorer">🧭 Explorer</option><option value="maintenance_supervisor">📋 Maint Sup</option><option value="production_supervisor">📈 Prod Sup</option></select></div>) : (demoUser && <div className="demo-role-switcher">{DEMO_ACCOUNTS.map((a) => <button key={a.email} type="button" className="demo-role-pill" disabled={Boolean(switchingDemo)} onClick={() => void switchDemo(a.email, a.pass)}>{switchingDemo === a.email ? "…" : a.label}</button>)}</div>)}<button type="button" className="ws-nav-pill subtle" onClick={() => navigate("/")}>🌐 Home</button></div></div>}
     <Routes>
-      <Route path="/" element={publicPage("landing", <LandingPage onSignIn={() => navigate("/login")} onGetStarted={() => navigate("/signup")} onNavigate={goPublic} />)} />
+      <Route path="/" element={publicPage("landing", <LandingPage onSignIn={() => navigate("/login")} onGetStarted={() => navigate("/signup")} onOpenApp={handleOpenApp} onNavigate={goPublic} />)} />
       <Route path="/evaluator" element={publicPage("evaluator", <EvaluatorPage onLaunchSuperAdmin={handleSuperAdminLogin} onNavigate={goPublic} />)} />
       <Route path="/about" element={publicPage("about", <AboutPage onNavigate={goPublic} onGetStarted={() => navigate("/signup")} />)} /><Route path="/legal" element={publicPage("legal", <LegalPage onNavigate={goPublic} />)} /><Route path="/contact" element={publicPage("contact", <ContactPage onNavigate={goPublic} />)} /><Route path="/pricing" element={publicPage("pricing", <PricingPage onNavigate={goPublic} onGetStarted={() => navigate("/signup")} />)} />
       <Route path="/demo" element={publicPage("demo", <DemoPage onDemoLogin={handleLogin} onNavigate={goPublic} />)} /><Route path="/individual" element={publicPage("individual", <IndividualPage onNavigate={goPublic} onGetStarted={() => navigate("/signup")} />)} /><Route path="/business" element={publicPage("business", <BusinessPage onNavigate={goPublic} onGetStarted={() => navigate("/signup")} />)} /><Route path="/now" element={publicPage("now", <NowPage onNavigate={goPublic} onGetStarted={() => navigate("/signup")} />)} /><Route path="/customize" element={publicPage("customize", <CustomizePage user={user} onNavigate={goPublic} onGetStarted={() => navigate("/signup")} onUpgradeSuccess={() => navigate("/app")} />)} />

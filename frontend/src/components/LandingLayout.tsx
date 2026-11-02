@@ -26,6 +26,7 @@ interface LandingLayoutProps {
   onNavigate: (view: PublicView) => void;
   onSignIn: () => void;
   onGetStarted: () => void;
+  onOpenApp?: () => void;
   currentView?: string;
 }
 
@@ -34,6 +35,7 @@ export function LandingLayout({
   onNavigate,
   onSignIn,
   onGetStarted,
+  onOpenApp,
   currentView = "landing",
 }: LandingLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -127,10 +129,37 @@ export function LandingLayout({
           >
             Contact
           </button>
+          <button
+            type="button"
+            className={`nav-link-btn ${currentView === "evaluator" ? "active" : ""}`}
+            onClick={() => handleNavLink("evaluator")}
+            style={{ color: "#38bdf8", fontWeight: 700 }}
+          >
+            🎓 Evaluator Portal
+          </button>
         </div>
 
-        {/* Actions: "For Business" link placed right next to "Log In" button */}
+        {/* Actions: Open App, For Business, Log In, Sign Up */}
         <div className="landing-nav-actions">
+          <button
+            type="button"
+            className="btn-primary nav-open-app-btn"
+            onClick={onOpenApp}
+            style={{
+              fontWeight: 700,
+              padding: "7px 15px",
+              fontSize: "0.85rem",
+              background: "linear-gradient(135deg, #10b981, #059669)",
+              border: "1px solid rgba(52, 211, 153, 0.4)",
+              color: "#ffffff",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              boxShadow: "0 2px 10px rgba(16, 185, 129, 0.3)",
+            }}
+          >
+            🚀 Open App
+          </button>
           <button
             type="button"
             className={`btn-ghost nav-business-btn ${currentView === "business" ? "active" : ""}`}
@@ -149,7 +178,7 @@ export function LandingLayout({
             Log In
           </button>
           <button type="button" className="btn-primary landing-nav-btn" onClick={onGetStarted}>
-            Get Started Free <IconArrowRight size={14} />
+            Sign Up <IconArrowRight size={14} />
           </button>
           <button
             type="button"
