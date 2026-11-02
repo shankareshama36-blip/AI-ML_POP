@@ -185,7 +185,17 @@ export function TechnicianPage({ user, onLogout, onOpenSettings }: TechnicianPag
           <div className="app-logo">
             <Logo />
           </div>
-          <span className="role-badge">{formattedRole}</span>
+          <span
+            className={`role-badge ${
+              user.is_evaluator || localStorage.getItem("praxis-evaluator-mode") === "true"
+                ? "evaluator-badge"
+                : ""
+            }`}
+          >
+            {user.is_evaluator || localStorage.getItem("praxis-evaluator-mode") === "true"
+              ? "🎓 Evaluator Mode (Super Admin)"
+              : formattedRole}
+          </span>
         </div>
         <div className="app-bar-right">
           <div className="user-chip">

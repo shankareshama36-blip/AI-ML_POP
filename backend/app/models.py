@@ -76,6 +76,36 @@ class DecisionContext(ContractModel):
 class DecisionEvaluationRequest(ContractModel):
     """One complete maintenance situation submitted to the decision loop."""
 
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "maintenance_request": {
+                    "machine_id": "M-101",
+                    "maintenance_type": "PREVENTIVE",
+                    "priority": "HIGH",
+                    "condition": "WARN",
+                    "action": "INSPECT",
+                },
+                "machine_state": {
+                    "temperature_c": 81.0,
+                    "vibration_mm_s": 5.5,
+                    "operating_hours": 1250,
+                    "status": "DEGRADED",
+                },
+                "operational_constraints": {
+                    "max_budget": 10000.0,
+                    "max_downtime_hours": 12.0,
+                    "deadline_hours": 16.0,
+                    "technicians_available": True,
+                    "spare_parts_available": True,
+                    "downtime_cost_per_hour": 1000.0,
+                    "risk_cost_factor": 10000.0,
+                },
+            }
+        },
+    )
+
     request_id: UUID = Field(default_factory=uuid4)
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     maintenance_request: MaintenanceRequest

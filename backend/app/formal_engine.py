@@ -6,6 +6,8 @@ from typing import Final
 from pydantic import BaseModel, ConfigDict, Field
 
 
+# FLAT: Explicit State Set (Q)
+# Formal 5-tuple component: Q = {START, MACHINE_VALID, TYPE_VALID, PRIORITY_VALID, CONDITION_VALID, ACTION_VALID, ACCEPT, REJECT}
 class DfaState(StrEnum):
     """Explicit states in the maintenance-request validation DFA."""
 
@@ -19,6 +21,8 @@ class DfaState(StrEnum):
     REJECT = "REJECT"
 
 
+# FLAT: Alphabet (Σ)
+# Valid categories consumed by the DFA: Σ = {MACHINE_ID, MAINTENANCE_TYPE, PRIORITY, CONDITION, ACTION, INVALID, END_OF_REQUEST}
 class InputSymbol(StrEnum):
     """The categories consumed by the DFA as it validates a request."""
 
@@ -34,7 +38,18 @@ class InputSymbol(StrEnum):
 class MaintenanceRequest(BaseModel):
     """Minimal maintenance request for the V1 formal validation stage."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "machine_id": "M-101",
+                "maintenance_type": "PREVENTIVE",
+                "priority": "INVALID_PRIORITY",
+                "condition": "NORMAL",
+                "action": "INSPECT",
+            }
+        },
+    )
 
     machine_id: str = Field(..., description="Machine or equipment identifier")
     maintenance_type: str = Field(..., description="Maintenance category")
@@ -45,6 +60,23 @@ class MaintenanceRequest(BaseModel):
 
 class DfaValidationResult(BaseModel):
     """Structured result returned by the DFA validator."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "accepted": False,
+                "final_state": "REJECT",
+                "reason": "Invalid priority",
+                "failed_at_position": "priority",
+                "trace": [
+                    "START",
+                    "MACHINE_VALID",
+                    "TYPE_VALID",
+                    "REJECT",
+                ],
+            }
+        }
+    )
 
     accepted: bool
     final_state: str
@@ -108,6 +140,8 @@ def normalize_value(value: str) -> str:
     return value.strip().upper()
 
 
+# FLAT: Deterministic Transition Function (δ)
+# δ: Q × Σ → Q mapping defining total, deterministic state transitions
 def transition(current_state: DfaState, input_symbol: InputSymbol) -> DfaState:
     """Deterministic transition function δ(state, symbol) -> next_state."""
 

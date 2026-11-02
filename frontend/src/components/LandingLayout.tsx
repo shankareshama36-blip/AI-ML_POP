@@ -14,7 +14,8 @@ export type PublicView =
   | "business"
   | "individual"
   | "demo"
-  | "now";
+  | "now"
+  | "evaluator";
 
 /** localStorage key + window event used to deep-link into a LegalPage tab. */
 export const LEGAL_TAB_KEY = "praxis-legal-tab";

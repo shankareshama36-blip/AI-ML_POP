@@ -5,6 +5,7 @@ import {
   IconArrowRight, IconCheckCircle, IconClipboard, IconClock,
   IconCpu, IconLayers, IconSearch, IconShield, IconTrending, IconWrench,
 } from "../components/Icons";
+import { AcademicEvidenceBoard } from "../components/AcademicEvidenceBoard";
 
 interface LandingPageProps {
   onSignIn: () => void;
@@ -65,7 +66,7 @@ export function LandingPage({ onSignIn, onGetStarted, onNavigate }: LandingPageP
         </div>
         <div className="hero-inner hero-inner-centered">
           <div className="hero-copy hero-copy-centered">
-            <div className="hero-badge fade-in-up">Autonomous &amp; Accountable Operations</div>
+            <div className="hero-badge fade-in-up">AI can act. Praxis decides.</div>
             <h1 className="hero-title fade-in-up delay-1">
               Make the Best Decision, <span className="hero-title-gradient">Every Time</span>
             </h1>
@@ -74,93 +75,21 @@ export function LandingPage({ onSignIn, onGetStarted, onNavigate }: LandingPageP
               and predictive AI models unified into one accountable decision engine.
             </p>
 
-            {/* Phase 3: 3 Distinct SaaS Pricing Cards (Demo, Individual, Business) */}
-            <div className="hero-pathways-grid fade-in-up delay-3">
-              {/* Card 1: Demo (Free Sandbox) */}
-              <div className="hero-pathway-card">
-                <div>
-                  <div className="hero-pathway-header">
-                    <span className="hero-pathway-badge demo">Free Sandbox</span>
-                    <span className="hero-pathway-tag">No Login</span>
-                  </div>
-                  <h3>Try the Sandbox</h3>
-                  <p>
-                    No signup required. Test the AI decision engine instantly with pre-configured roles.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="hero-pathway-btn btn-demo"
-                  onClick={() => (onNavigate ? onNavigate("demo") : onSignIn())}
-                >
-                  Launch Demo <IconArrowRight size={15} />
-                </button>
-              </div>
-
-              {/* Card 2: Individual (30-Day Trial) — Featured */}
-              <div className="hero-pathway-card featured">
-                <div>
-                  <div className="hero-pathway-header">
-                    <span className="hero-pathway-badge individual">30-Day Trial</span>
-                    <span className="hero-pathway-tag" style={{ color: "#60a5fa" }}>Most Popular</span>
-                  </div>
-                  <h3>For Individuals</h3>
-                  <p>
-                    Start governing decisions with formal verification. 30 days free, cancel anytime.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="hero-pathway-btn btn-trial"
-                  onClick={() => (onNavigate ? onNavigate("individual") : onGetStarted())}
-                >
-                  Start Free Trial <IconArrowRight size={15} />
-                </button>
-              </div>
-
-              {/* Card 3: Business (Enterprise) */}
-              <div className="hero-pathway-card">
-                <div>
-                  <div className="hero-pathway-header">
-                    <span className="hero-pathway-badge business">Enterprise</span>
-                    <span className="hero-pathway-tag">Custom SLA</span>
-                  </div>
-                  <h3>For Business</h3>
-                  <p>
-                    Custom roles, multi-tenant isolation, automated audit logging, and enterprise SLA.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="hero-pathway-btn btn-business"
-                  onClick={() => (onNavigate ? onNavigate("business") : onGetStarted())}
-                >
-                  Explore Business <IconArrowRight size={15} />
-                </button>
-              </div>
-            </div>
-
-            {/* Now / Manifesto Link */}
-            <div className="hero-manifesto-row fade-in-up delay-4" style={{ marginTop: "24px", textAlign: "center" }}>
+            {/* The ONLY two Hero buttons: Evaluator Access and Login / Sign Up */}
+            <div className="hero-evaluator-cta-row fade-in-up delay-3">
               <button
                 type="button"
-                className="btn-link"
-                onClick={() => (onNavigate ? onNavigate("now") : undefined)}
-                style={{
-                  fontSize: "14px",
-                  fontWeight: 600,
-                  color: "#60a5fa",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  padding: "8px 18px",
-                  background: "rgba(37, 99, 235, 0.1)",
-                  border: "1px solid rgba(37, 99, 235, 0.25)",
-                  borderRadius: "999px",
-                  cursor: "pointer",
-                }}
+                className="btn-hero-evaluator"
+                onClick={() => (onNavigate ? onNavigate("evaluator") : undefined)}
               >
-                📜 Read our Manifesto →
+                🎓 Evaluator Access <IconArrowRight size={16} />
+              </button>
+              <button
+                type="button"
+                className="btn-hero-login"
+                onClick={onSignIn}
+              >
+                Login / Sign Up
               </button>
             </div>
 
@@ -170,6 +99,9 @@ export function LandingPage({ onSignIn, onGetStarted, onNavigate }: LandingPageP
               <span className="hero-trust-item"><IconCpu size={15} /> Specialized ANI Agent</span>
             </div>
           </div>
+
+          {/* Technical Evaluation Board: Academic Proofs (FLAT + DAA + AI-ML) */}
+          <AcademicEvidenceBoard />
 
           {/* Stylized CSS-Only Product Mockup Card */}
           <div className="decision-showcase decision-showcase-centered fade-in-up delay-4" aria-label="Example Praxis decision card">

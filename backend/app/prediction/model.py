@@ -35,6 +35,8 @@ class PredictionEngine:
         """Build a single-row DataFrame with the exact training column names."""
         return pd.DataFrame([row], columns=self.feature_columns)
 
+    # AI-ML: Random Forest Inference
+    # Ensemble of decision trees predicting operational impact from telemetry features
     def predict(
         self,
         temperature_c: float,
@@ -54,6 +56,8 @@ class PredictionEngine:
         )
         X = self._to_dataframe(row)
 
+        # AI-ML: Regression outputs (Downtime, Cost) & Classification (Risk)
+        # Continuous target estimates via RandomForestRegressor; risk category via RandomForestClassifier
         downtime = float(self.downtime_model.predict(X)[0])
         cost = float(self.cost_model.predict(X)[0])
 

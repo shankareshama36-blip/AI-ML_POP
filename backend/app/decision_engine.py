@@ -187,6 +187,8 @@ def evaluate_constraints(
     return results
 
 
+# DAA: Dijkstra's Algorithm (Min-Heap Priority Queue)
+# Time Complexity: O((V + E) log V) via heapq priority queue
 def _dijkstra_shortest_paths(
     graph: dict[str, dict[str, float]], source: str
 ) -> dict[str, float]:
@@ -226,6 +228,8 @@ def optimize_actions(
             "No candidate action satisfies all hard constraints"
         )
 
+    # DAA: Graph Weight Calculation (Cost + Downtime + Risk)
+    # Objective Weight: w(SOURCE, Action) = Cost + (Downtime * Rate) + (Risk * Factor)
     scores = {
         prediction.action_id: round(
             prediction.predicted_cost

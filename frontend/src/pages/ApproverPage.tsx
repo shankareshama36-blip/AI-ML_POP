@@ -245,7 +245,17 @@ export function ApproverPage({ user, onLogout, onOpenSettings }: ApproverPagePro
           <div className="app-logo">
             <Logo />
           </div>
-          <span className="role-badge">{formatRole(user.role)}</span>
+          <span
+            className={`role-badge ${
+              user.is_evaluator || localStorage.getItem("praxis-evaluator-mode") === "true"
+                ? "evaluator-badge"
+                : ""
+            }`}
+          >
+            {user.is_evaluator || localStorage.getItem("praxis-evaluator-mode") === "true"
+              ? "🎓 Evaluator Mode (Super Admin)"
+              : formatRole(user.role)}
+          </span>
         </div>
         <div className="app-bar-right">
           <div className="user-chip">
