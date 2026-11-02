@@ -90,8 +90,8 @@ function loadSavedMessages(ctx: SavedChatContext | null): ChatMessageInput[] {
     // Ignore storage parse error
   }
   const greeting = ctx?.title
-    ? `Hello! I am Praxis, a specialized ANI Decision Agent. I have your operational context loaded for "${ctx.title}". How can I assist with constraint satisfaction or Pareto optimization?`
-    : "Hello! I am Praxis, a specialized ANI Decision Agent. I evaluate operational constraints, calculate trade-offs, and verify decision state machines. How can I assist with your operational decision?";
+    ? `Hi! I'm Praxis, your decision assistant. I have the context for "${ctx.title}" ready. How can I help you today?`
+    : "Hi! I'm Praxis, your decision assistant. How can I help you today?";
   return [{ role: "assistant", content: greeting }];
 }
 

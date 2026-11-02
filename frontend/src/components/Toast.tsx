@@ -32,7 +32,7 @@ export function triggerToast(message: string, type: ToastType = "error") {
 export function formatUserFriendlyError(err: unknown): string {
   if (!err) return "Error: Unknown failure occurred.";
 
-  let actualReason = "";
+  let actualReason: string;
 
   // Check if it's already a clean string
   if (typeof err === "string") {

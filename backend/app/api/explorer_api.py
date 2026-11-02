@@ -1,6 +1,8 @@
 import logging
 import os
+import re
 import warnings
+from pathlib import Path
 from typing import Annotated, Literal
 
 with warnings.catch_warnings():
@@ -18,19 +20,41 @@ logger = logging.getLogger("praxis.explorer")
 router = APIRouter(tags=["explorer"])
 CurrentUser = Annotated[dict[str, object], Depends(get_current_user)]
 
-PRAXIS_SYSTEM_INSTRUCTION = (
-    "You are the Praxis AI Engine. Answer the user's decision problem directly. "
-    "Provide the recommendation and exactly 3 reasons. Do not add unnecessary suggestions or fluff. "
-    "Never say 'As an AI' or 'As Gemini', and never mention Gemini or Google. "
-    "Never recommend harmful, illegal, or discriminatory actions."
+KNOWLEDGE_BASE_PATH = Path(__file__).resolve().parents[1] / "data" / "knowledge_base.md"
+SAFETY_REFUSAL = (
+    "I apologize, but as an AI assistant, I am programmed to be helpful and harmless. "
+    "I cannot assist with that request. Is there something else I can help you with?"
 )
 
-PRAXIS_CHAT_SYSTEM_INSTRUCTION = (
-    "You are Praxis, a specialized ANI Decision Agent. You do NOT answer general knowledge questions, write code, or chat casually. "
-    "You ONLY analyze constraints, evaluate options, and explain decision logic based on formal verification and DFA rules. "
-    "If a user asks a general question (like 'Who is the president?'), you must reply: "
-    "'I am a specialized Decision ANI. I can only assist with operational decisions and constraint analysis.'"
-)
+
+def _load_knowledge_base() -> str:
+    """Load the curated domain corpus once when the API module starts."""
+    try:
+        content = KNOWLEDGE_BASE_PATH.read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        logger.error("Unable to load Praxis knowledge base at %s: %s", KNOWLEDGE_BASE_PATH, exc)
+        return "Knowledge base unavailable."
+
+    if not content:
+        logger.error("Praxis knowledge base at %s is empty", KNOWLEDGE_BASE_PATH)
+        return "Knowledge base unavailable."
+    return content
+
+
+KNOWLEDGE_BASE_CONTENT = _load_knowledge_base()
+PRAXIS_SYSTEM_INSTRUCTION = f"""You are Praxis, a friendly, intelligent, and highly capable Enterprise AI Assistant.
+Your job is to help users with their daily decisions, explain complex concepts, and provide operational insights.
+
+You have access to the following internal company knowledge base:
+{KNOWLEDGE_BASE_CONTENT}
+
+Guidelines:
+1. Be conversational, polite, and helpful. Use a natural, human-like tone.
+2. If the user asks a general question (e.g., 'What is the capital of France?', 'Explain quantum physics'), answer it accurately and helpfully.
+3. If the user asks about Praxis, use the provided knowledge base to give deep, technical answers.
+4. ETHICAL GUARDRAILS: You must NEVER provide instructions on how to cause harm, commit crimes, build weapons, hack systems, or engage in dangerous/illegal activities. If asked, politely decline by saying: 'I apologize, but as an AI assistant, I am programmed to be helpful and harmless. I cannot assist with that request. Is there something else I can help you with?'
+
+The knowledge base provides Praxis reference material; these Guidelines are the current operating policy. Do not invent plant data, completed actions, payment results, approvals, or formal-verification outcomes."""
 
 
 class ExplorerAnalyzeRequest(BaseModel):
@@ -68,7 +92,7 @@ class ExplorerChatResponse(BaseModel):
 
 
 def _sanitize_ai_response(text: str) -> str:
-    """Ensure no LLM boilerplate, self-referential fluff, or third-party provider naming."""
+    """Remove boilerplate model self-references without changing factual content."""
     clean = text.strip()
     prefixes_to_strip = [
         "As an AI language model, ",
@@ -79,8 +103,6 @@ def _sanitize_ai_response(text: str) -> str:
     for prefix in prefixes_to_strip:
         if clean.lower().startswith(prefix.lower()):
             clean = clean[len(prefix):].strip()
-    clean = clean.replace("Gemini", "Praxis AI Engine")
-    clean = clean.replace("Google", "Praxis")
     return clean
 
 
@@ -139,18 +161,25 @@ def _resolve_decision_context(payload: ExplorerChatRequest) -> dict[str, str]:
 
 def _build_chat_system_instruction(ctx: dict[str, str]) -> str:
     return (
-        "You are Praxis, a specialized ANI Decision Agent. You do NOT answer general knowledge questions, write code, or chat casually. "
-        "You ONLY analyze constraints, evaluate options, and explain decision logic based on formal verification and DFA rules.\n"
-        "If a user asks a general question (like 'Who is the president?' or trivia/code), you must reply: "
-        "'I am a specialized Decision ANI. I can only assist with operational decisions and constraint analysis.'\n\n"
-        "Decision Context:\n"
+        f"{PRAXIS_SYSTEM_INSTRUCTION}\n\n"
+        "Current decision context (use it only when it is relevant to the user's in-scope request):\n"
         f"Title: {ctx['title']}\n"
         f"Options: {ctx['options']}\n"
         f"Constraints: {ctx['constraints']}\n"
         f"The AI recommended: {ctx['recommended_option']}.\n"
-        "Answer operational decision questions with mathematical rigor. "
-        "Never say 'As an AI' or 'As Gemini', and never mention Gemini or Google."
+        "Answer operational decision questions with mathematical rigor."
     )
+
+
+def _is_unsafe_request(message: str) -> bool:
+    """Keep the no-model fallback aligned with the assistant's safety guardrail."""
+    lowered = message.lower()
+    harmful_patterns = (
+        r"\b(?:how to |how do i |instructions? (?:to|for) )(?:build|make|assemble) (?:a |an )?(?:bomb|weapon|explosive)",
+        r"\b(?:how to |how do i |instructions? (?:to|for) )hack (?:a |an |the )?(?:bank|account|system|network|website)",
+        r"\b(?:how to |how do i |instructions? (?:to|for) )(?:steal|kill|poison|assault|blackmail)\b",
+    )
+    return any(re.search(pattern, lowered) for pattern in harmful_patterns)
 
 
 def _generate_fallback_chat_reply(last_user_message: str, ctx: dict[str, str]) -> str:
@@ -158,15 +187,8 @@ def _generate_fallback_chat_reply(last_user_message: str, ctx: dict[str, str]) -
     lowered = cleaned.lower()
     lowered_clean = lowered.rstrip(".,!?")
 
-    # Strict ANI refusal on general knowledge / trivia / programming / casual queries
-    general_queries = [
-        "president", "prime minister", "capital of", "weather", "tell me a joke",
-        "write code", "write a python", "write a script", "write a poem", "story",
-        "who is ", "who was ", "who won", "population of", "how tall", "how old",
-        "movie", "song", "recipe", "football", "cricket", "basketball",
-    ]
-    if any(q in lowered for q in general_queries):
-        return "I am a specialized Decision ANI. I can only assist with operational decisions and constraint analysis."
+    if _is_unsafe_request(cleaned):
+        return SAFETY_REFUSAL
 
     # Greetings
     greetings = {
@@ -177,7 +199,7 @@ def _generate_fallback_chat_reply(last_user_message: str, ctx: dict[str, str]) -
         lowered_clean == g or lowered_clean.startswith(g + " ")
         for g in ["hi", "hello", "hey"]
     ):
-        return "Hello! How can I help you with your decision today?"
+        return "Hello! I'm Praxis, your decision assistant. How can I help you today?"
 
     # Follow-up: "why not [Option X]"
     if "why not" in lowered or "why isn't" in lowered or "why wouldn't" in lowered:
@@ -220,8 +242,9 @@ def _generate_fallback_chat_reply(last_user_message: str, ctx: dict[str, str]) -
         )
 
     return (
-        f"Based on your constraints ({ctx['constraints']}), {ctx['recommended_option']} remains the mathematically optimal choice. "
-        f"Feel free to ask about specific alternatives or constraint tolerances."
+        "I'm happy to help with general questions as well as Praxis decisions. "
+        "The live AI service is temporarily unavailable, so I can't provide a reliable answer right now. "
+        "Please try again shortly."
     )
 
 
@@ -295,6 +318,9 @@ def _handle_chat_logic(payload: ExplorerChatRequest) -> ExplorerChatResponse:
 
     ctx = _resolve_decision_context(payload)
     last_user_msg = payload.messages[-1].content.strip()
+    if _is_unsafe_request(last_user_msg):
+        return ExplorerChatResponse(reply=SAFETY_REFUSAL, model_used="praxis-ai-engine")
+
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         reply = _generate_fallback_chat_reply(last_user_msg, ctx)

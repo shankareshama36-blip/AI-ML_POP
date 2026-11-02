@@ -12,7 +12,8 @@
   "dependencies": {
     "@clerk/clerk-react": "^5.61.11",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^6.30.6"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

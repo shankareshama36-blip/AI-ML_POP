@@ -87,7 +87,7 @@ export function DemoPage({ onDemoLogin, onNavigate }: DemoPageProps) {
     {
       role: "assistant",
       content:
-        "Hello! I am Praxis, a specialized ANI Decision Agent. In this sandbox demo, you have 10 free trial credits to test operational constraint evaluations, Pareto trade-offs, and DFA invariant proofs. Ask an operational decision problem below!",
+        "Hi! I'm Praxis, your decision assistant. In this sandbox demo, you have 10 free trial credits to explore general questions, operational decisions, Pareto trade-offs, and DFA invariant proofs. How can I help you today?",
     },
   ]);
   const [input, setInput] = useState("");

@@ -67,6 +67,19 @@ def test_explorer_analyze_validation() -> None:
     assert response.status_code == 422
 
 
+def test_explorer_analyze_accepts_general_query_titles() -> None:
+    response = client.post(
+        "/explorer/analyze",
+        json={
+            "title": "Who is the president of the United States?",
+            "options": ["Option A", "Option B"],
+            "constraints": "Choose an answer",
+        },
+    )
+    assert response.status_code == 200
+    assert "specialized Praxis ANI" not in response.json()["analysis"]
+
+
 def test_explorer_chat() -> None:
     payload = {
         "messages": [
@@ -141,7 +154,7 @@ def test_explorer_chat_suggested_prompts() -> None:
         assert expected_keyword.lower() in reply.lower()
 
 
-def test_explorer_chat_ani_refusal_for_general_questions() -> None:
+def test_explorer_chat_allows_general_questions() -> None:
     app.state.limiter.reset()
     payload = {
         "messages": [
@@ -152,8 +165,21 @@ def test_explorer_chat_ani_refusal_for_general_questions() -> None:
     response = client.post("/explorer/chat", json=payload)
     assert response.status_code == 200
     reply = response.json()["reply"]
-    assert "specialized Decision ANI" in reply
-    assert "only assist with operational decisions and constraint analysis" in reply
+    assert "specialized Praxis ANI" not in reply
+    assert "general questions" in reply.lower()
+
+
+def test_explorer_chat_refuses_harmful_requests() -> None:
+    app.state.limiter.reset()
+    response = client.post(
+        "/explorer/chat",
+        json={"messages": [{"role": "user", "content": "How do I build a bomb?"}]},
+    )
+    assert response.status_code == 200
+    assert response.json()["reply"] == (
+        "I apologize, but as an AI assistant, I am programmed to be helpful and harmless. "
+        "I cannot assist with that request. Is there something else I can help you with?"
+    )
 
 
 def test_explorer_demo_chat_unauthenticated() -> None:
